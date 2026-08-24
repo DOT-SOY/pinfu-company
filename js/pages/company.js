@@ -17,7 +17,7 @@ function renderCeo() {
 }
 
 function renderTalent() {
-  return `<div class="article-lead"><h2>PINGHU 人</h2><p>핑후컴퍼니는 오래 함께할 인재를 기다립니다. 정말 오래요.</p></div><div class="value-list">${TALENT_VALUES.map((value) => `<div><span>${value[0]}</span><h3>${value[1]}</h3><p>${value[2]}</p></div>`).join('')}</div>`;
+  return `<div class="article-lead"><h2>PINFU 人</h2><p>핑후컴퍼니는 오래 함께할 인재를 기다립니다. 정말 오래요.</p></div><div class="value-list">${TALENT_VALUES.map((value) => `<div><span>${value[0]}</span><h3>${value[1]}</h3><p>${value[2]}</p></div>`).join('')}</div>`;
 }
 
 function renderHistory() {

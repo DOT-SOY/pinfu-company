@@ -12,7 +12,7 @@ export function renderHome(notices) {
     service('02', '▤', '자료마당', '새로운 소식과 사내 자료를 한곳에서 확인하세요.', '#/board/press'),
     service('03', '◇', '채용정보', '당신의 가능성이 우리의 다음 장면이 됩니다.', '#/recruit'),
     '</div></section>',
-    '<section class="news-band"><div class="shell news-grid"><div class="news-title"><span class="eyebrow">PINGHU NEWS</span><h2>노동한국의 오늘을<br>전합니다.</h2><a href="#/board/press">전체 보기 ↗</a></div><div class="notice-list">',
+    '<section class="news-band"><div class="shell news-grid"><div class="news-title"><span class="eyebrow">PINFU NEWS</span><h2>노동한국의 오늘을<br>전합니다.</h2><a href="#/board/press">전체 보기 ↗</a></div><div class="notice-list">',
     notices.map((post, index) => `<a href="#/board/press/${post.id}"><span>0${index + 1}</span><strong>${esc(post.title)}</strong><time>${esc(post.publishedMonth)}</time><i>→</i></a>`).join(''),
     '</div></div></section>'
   ].join('');
