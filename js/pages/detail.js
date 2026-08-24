@@ -2,6 +2,7 @@ import { getAuthState } from '../auth.js';
 import { buildCommentTree, createComment, softDeleteComment, updateComment } from '../comments.js';
 import { deletePost } from '../posts.js';
 import { boardFor, errorMessage, esc, formatDate, lines, setBusy } from '../ui.js';
+import { renderMarkdown } from '../markdown.js';
 
 let replyOpen = null;
 
@@ -31,7 +32,7 @@ export function renderDetail(board, post, comments) {
   const auth = getAuthState();
   const tree = buildCommentTree(comments);
   const thread = tree.length ? tree.map((node) => renderCommentNode(node, 0)).join('') : '<div class="empty-state">첫 댓글을 남겨보세요.</div>';
-  return `<section class="detail-shell shell"><article class="post-detail"><header><span class="post-category">${esc(post.category)}</span><h1>${esc(post.title)}</h1><div class="post-meta"><span>${esc(post.author?.nickname || '관리자')}</span><time>${formatDate(post.published_at)}</time></div></header><div class="post-body preserve-lines">${lines(post.content)}</div><div class="post-navigation"><a href="#/board/${board}">← 목록으로</a>${auth.isAdmin ? `<span><a href="#/admin/edit?id=${post.id}">수정</a><button id="delete-post" type="button">삭제</button></span>` : ''}</div><section class="comments"><div class="comments-title"><h2>댓글 <span>${comments.length}</span></h2></div>${commentForm(null)}<div class="comment-list">${thread}</div></section></article></section>`;
+  return `<section class="detail-shell shell"><article class="post-detail"><header><span class="post-category">${esc(post.category)}</span><h1>${esc(post.title)}</h1><div class="post-meta"><span>${esc(post.author?.nickname || '관리자')}</span><time>${formatDate(post.published_at)}</time></div></header><div class="post-body markdown-body">${renderMarkdown(post.content)}</div><div class="post-navigation"><a href="#/board/${board}">← 목록으로</a>${auth.isAdmin ? `<span><a href="#/admin/edit?id=${post.id}">수정</a><button id="delete-post" type="button">삭제</button></span>` : ''}</div><section class="comments"><div class="comments-title"><h2>댓글 <span>${comments.length}</span></h2></div>${commentForm(null)}<div class="comment-list">${thread}</div></section></article></section>`;
 }
 
 export function bindDetail({ post, comments, refresh, navigate }) {

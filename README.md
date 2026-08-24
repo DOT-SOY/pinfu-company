@@ -36,6 +36,7 @@ WHERE id = (
 
 - `script.js`: hash routing, 페이지 데이터 로딩, 전역 메뉴 이벤트, 앱 초기화
 - `js/ui.js`: 공통 이스케이프, 날짜, 메시지, 로딩 UI 유틸리티
+- `js/markdown.js`: 게시글 본문의 안전한 Markdown 렌더링
 - `js/pages/home.js`: 홈
 - `js/pages/company.js`: 회사소개 공통 레이아웃과 콘텐츠 렌더링
 - `js/pages/recruit.js`: 채용정보
@@ -45,3 +46,7 @@ WHERE id = (
 - `js/pages/admin.js`: 관리자 게시글 작성과 수정
 - `js/data/company-content.js`: CEO 인사말, 인재상, 연혁, 조직도 수정용 데이터
 - `js/data/fallback-posts.js`: Supabase 설정 전 홈에 표시하는 보도자료 예시
+
+## 게시글 Markdown
+
+관리자 게시글 본문은 제목, 굵게, 기울임, 취소선, 링크, 이미지, 인용문, 목록, 표, 구분선, 인라인 코드, 코드 블록 문법을 지원합니다. 원본 Markdown은 기존처럼 `posts.content`에 저장되고 상세 화면에서만 HTML로 변환됩니다. 직접 입력한 HTML은 실행하지 않고 문자로 표시하며, 링크와 이미지 URL은 `http`, `https`, 사이트 내부 상대 경로만 허용합니다.
