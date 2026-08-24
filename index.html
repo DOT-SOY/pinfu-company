@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="좋은 패를 기다리기보다, 들어온 패로 화료하는 핑후컴퍼니 공식 홈페이지">
+  <meta property="og:title" content="핑후컴퍼니">
+  <meta property="og:description" content="1962년 설립된 전동작탁·마작용품 전문 제조기업">
+  <meta property="og:image" content="./assets/og.png">
+  <title>핑후컴퍼니</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#app">본문으로 바로가기</a>
+  <div class="utility"><div class="shell"><span>PINGHU COMPANY</span><span id="auth-utility"><a href="#/login">로그인</a> · <a href="#/signup">회원가입</a></span></div></div>
+  <header class="site-header">
+    <div class="shell nav-wrap">
+      <a class="brand" href="#/" aria-label="핑후컴퍼니 홈">
+        <span class="brand-mark">P</span>
+        <span><strong>핑후컴퍼니</strong><small>PINGHU COMPANY</small></span>
+      </a>
+      <nav aria-label="주요 메뉴">
+        <div class="nav-group"><a href="#/company/ceo">회사소개</a><div class="dropdown">
+          <a href="#/company/ceo">CEO 인사말</a><a href="#/company/talent">핑후컴퍼니 인재상</a><a href="#/company/history">회사 연혁</a><a href="#/company/organization">조직도</a>
+        </div></div>
+        <div class="nav-group"><a href="#/board/press">자료마당</a><div class="dropdown">
+          <a href="#/board/press">보도자료</a><a href="#/board/resources">회사자료</a>
+        </div></div>
+        <a href="#/recruit">채용정보</a>
+        <a id="open-chat-nav" href="https://open.kakao.com/" target="_blank" rel="noreferrer">고객센터</a>
+      </nav>
+      <div class="account-nav" id="account-nav" aria-live="polite"></div>
+      <button class="mobile-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu">MENU</button>
+      <div class="mobile-menu" id="mobile-menu" hidden>
+        <a href="#/company/ceo">회사소개</a><a href="#/board/press">보도자료</a><a href="#/board/resources">회사자료</a><a href="#/recruit">채용정보</a><a id="open-chat-mobile" href="https://open.kakao.com/" target="_blank" rel="noreferrer">고객센터</a><span id="mobile-auth-links"></span>
+      </div>
+    </div>
+  </header>
+  <main id="app" tabindex="-1"></main>
+  <section class="contact-strip">
+    <div class="shell"><div><span class="eyebrow dark">CONTACT</span><h2>궁금한 이야기가 있으신가요?</h2></div><a id="open-chat-footer" href="https://open.kakao.com/" target="_blank" rel="noreferrer">오픈채팅 문의하기 <span>↗</span></a></div>
+  </section>
+  <footer><div class="shell"><strong>PINGHU COMPANY</strong><p>1962년 설립된 전동작탁·마작용품 전문 제조기업입니다.</p><small>© 2012 PINGHU COMPANY. ALL RIGHTS RESERVED.</small></div></footer>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="./script.js"></script>
+</body>
+</html>
