@@ -1,0 +1,14 @@
+import { getAuthState } from '../auth.js';
+import { listUsersForOrgAdmin, setUserRole } from '../organization.js';
+import { esc, message } from '../ui.js';
+import { orgErrorMessage } from '../organization-schema.js';
+
+const roleLabel={user:'일반 회원',org_editor:'조직도 프로필 편집자',admin:'관리자'};
+
+export const loadOrganizationUsers = () => listUsersForOrgAdmin();
+
+function tabs(){return '<nav class="organization-admin-tabs" aria-label="조직도 관리"><a href="#/admin/organization">레이아웃</a><a href="#/admin/organization?tab=profiles">프로필</a><a href="#/admin/organization/templates">템플릿</a><a class="active" href="#/admin/organization/users">사용자 권한</a></nav>';}
+
+export function renderOrganizationUsersAdmin(users){const auth=getAuthState();if(!auth.loggedIn)return `<section class="shell status-page">${message('로그인이 필요합니다.','error')}</section>`;if(!auth.isAdmin)return `<section class="shell status-page">${message('권한이 없습니다.','error')}</section>`;return `<section class="organization-admin-page"><header class="organization-admin-header"><div><small>ORGANIZATION CMS</small><h1>사용자 권한 관리</h1></div>${tabs()}</header><div class="organization-users-admin"><label class="organization-user-search">닉네임 검색<input type="search" data-user-search placeholder="검색어를 입력하세요"></label><div class="organization-user-list">${users.map((user)=>`<div data-user-row data-nickname="${esc(user.nickname).toLowerCase()}"><div><strong>${esc(user.nickname)}</strong><small>${esc(user.id)}</small></div><select data-user-role="${esc(user.id)}" data-current-role="${esc(user.role)}"><option value="user" ${user.role==='user'?'selected':''}>일반 회원</option><option value="org_editor" ${user.role==='org_editor'?'selected':''}>조직도 프로필 편집자</option><option value="admin" ${user.role==='admin'?'selected':''}>관리자</option></select></div>`).join('')}</div><div id="org-users-message"></div></div></section>`;}
+
+export function bindOrganizationUsersAdmin({users,refresh}){const search=document.querySelector('[data-user-search]');if(!search)return;search.addEventListener('input',()=>{const query=search.value.trim().toLowerCase();document.querySelectorAll('[data-user-row]').forEach((row)=>{row.hidden=!row.dataset.nickname.includes(query);});});document.querySelectorAll('[data-user-role]').forEach((select)=>select.addEventListener('change',async()=>{const user=users.find((item)=>item.id===select.dataset.userRole),previous=select.dataset.currentRole,next=select.value;if(!confirm(`${user.nickname}님의 권한을\n'${roleLabel[next]}'(으)로 변경하시겠습니까?`)){select.value=previous;return;}select.disabled=true;try{await setUserRole(user.id,next);document.getElementById('org-users-message').innerHTML=message('사용자 권한을 변경했습니다.','success');refresh();}catch(error){select.value=previous;document.getElementById('org-users-message').innerHTML=message(orgErrorMessage(error,'권한 변경에 실패했습니다.'),'error');select.disabled=false;}}));}

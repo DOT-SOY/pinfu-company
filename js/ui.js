@@ -36,6 +36,7 @@ export function setBusy(button, busy, label = '처리 중…') {
 
 export function errorMessage(error, fallback) {
   console.error(error);
+  if (error?.message === 'SUPABASE_CONNECTION_FAILED') return 'Supabase 연결에 실패했습니다.';
   if (error?.message === 'SUPABASE_NOT_CONFIGURED') return 'Supabase 연결 정보가 아직 설정되지 않았습니다.';
   if (error?.message === 'NICKNAME_TAKEN' || error?.code === '23505') return '이미 사용 중인 닉네임입니다.';
   if (error?.message?.includes('Invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다.';

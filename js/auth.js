@@ -27,13 +27,30 @@ async function setUser(user) {
 
 function notify() { listeners.forEach((listener) => listener(getAuthState())); }
 export function onAuthChange(listener) { listeners.add(listener); return () => listeners.delete(listener); }
-export function getAuthState() { return { user: currentUser, profile: currentProfile, loggedIn: !!currentUser, isAdmin: currentProfile?.role === 'admin' }; }
+export function deriveRoleState(role) {
+  return {
+    isAdmin: role === 'admin',
+    isOrgEditor: role === 'org_editor',
+    canManageOrgProfile: role === 'org_editor' || role === 'admin'
+  };
+}
+export function getAuthState() {
+  const role = currentProfile?.role;
+  return {
+    user: currentUser,
+    profile: currentProfile,
+    loggedIn: !!currentUser,
+    ...deriveRoleState(role)
+  };
+}
 export const getCurrentUser = () => currentUser;
 export const getCurrentProfile = () => currentProfile;
 export const getNickname = () => currentProfile?.nickname || '';
 export const getRole = () => currentProfile?.role || null;
 export const isLoggedIn = () => !!currentUser;
 export const isAdmin = () => currentProfile?.role === 'admin';
+export const isOrgEditor = () => currentProfile?.role === 'org_editor';
+export const canManageOrgProfile = () => ['org_editor', 'admin'].includes(currentProfile?.role);
 
 export async function signUp(email, password, nickname) {
   const client = requireDatabase();

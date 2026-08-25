@@ -1,4 +1,4 @@
-import { isSupabaseConfigured } from './js/supabase.js';
+import { initDatabase, isSupabaseConfigured } from './js/supabase.js';
 import { getAuthState, initAuth, onAuthChange, signOut } from './js/auth.js';
 import { getPost, listPosts } from './js/posts.js';
 import { listComments } from './js/comments.js';
@@ -10,6 +10,13 @@ import { renderBoard } from './js/pages/board.js';
 import { bindDetail, renderDetail, resetDetailState } from './js/pages/detail.js';
 import { bindAccount, bindAuth, renderAccount, renderAuth } from './js/pages/auth-account.js';
 import { bindAdmin, renderAdmin } from './js/pages/admin.js';
+import { getActiveOrgTemplate, getMyOrgProfile, getOrgProfile, getOrgProfileDetail, loadPublicOrganization } from './js/organization.js';
+import { bindOrganizationViewer, renderOrganization } from './js/pages/organization.js';
+import { renderOrganizationDetail } from './js/pages/organization-detail.js';
+import { bindOrganizationProfileEditor, renderOrganizationProfileEditor } from './js/pages/organization-profile-editor.js';
+import { bindOrganizationAdmin, confirmLeaveOrganizationEditor, loadOrganizationAdminData, renderOrganizationAdmin } from './js/pages/organization-admin.js';
+import { bindOrganizationTemplateEditor, confirmLeaveOrganizationTemplateEditor, loadOrganizationTemplatesData, renderOrganizationTemplateEditor } from './js/pages/organization-template-editor.js';
+import { bindOrganizationUsersAdmin, loadOrganizationUsers, renderOrganizationUsersAdmin } from './js/pages/organization-users-admin.js';
 import { categoryFor, errorMessage, esc, message } from './js/ui.js';
 
 const OPEN_CHAT_URL = 'https://open.kakao.com/'; // 실제 Q&A 오픈채팅 주소로 교체하세요.
@@ -29,10 +36,22 @@ async function render() {
   let title = '핑후컴퍼니';
   let html;
   let adminPost = null;
-  app.innerHTML = '<div class="shell loading-state">불러오는 중…</div>';
+  const params = new URLSearchParams(location.hash.split('?')[1] || '');
+  let pageData = null;
+  app.innerHTML = `<div class="shell loading-state">${parts.includes('organization') ? '조직도를 불러오는 중입니다...' : '불러오는 중…'}</div>`;
 
   try {
-    if (parts[0] === 'company') {
+    if (parts[0] === 'company' && parts[1] === 'organization' && parts[2]) {
+      const profileId = Number(parts[2]);
+      if (!Number.isSafeInteger(profileId) || profileId < 1) throw new Error('INVALID_ORG_PROFILE_ID');
+      const [profile, detail, innerTemplate] = await Promise.all([getOrgProfile(profileId), getOrgProfileDetail(profileId), getActiveOrgTemplate('INNER')]);
+      html = renderOrganizationDetail({ profile, detail, innerTemplate });
+      title = `${profile?.name || '프로필'} | 핑후컴퍼니`;
+    } else if (parts[0] === 'company' && parts[1] === 'organization') {
+      pageData = await loadPublicOrganization();
+      html = renderOrganization(pageData);
+      title = '조직도 | 핑후컴퍼니';
+    } else if (parts[0] === 'company') {
       const slug = parts[1] || 'ceo';
       html = renderCompany(slug);
       title = `${getCompanyTitle(slug)} | 핑후컴퍼니`;
@@ -42,11 +61,33 @@ async function render() {
     } else if (parts[0] === 'login' || parts[0] === 'signup') {
       html = renderAuth(parts[0]);
       title = `${parts[0] === 'login' ? '로그인' : '회원가입'} | 핑후컴퍼니`;
+    } else if (parts[0] === 'account' && parts[1] === 'organization') {
+      const auth = getAuthState();
+      let profile = null, detail = null;
+      const innerTemplate = await getActiveOrgTemplate('INNER');
+      if (auth.loggedIn && auth.canManageOrgProfile) {
+        profile = await getMyOrgProfile(auth.user.id);
+        detail = profile ? await getOrgProfileDetail(profile.id) : null;
+      }
+      pageData = { profile, detail, innerTemplate };
+      html = renderOrganizationProfileEditor(pageData);
+      title = '조직도 프로필 | 핑후컴퍼니';
     } else if (parts[0] === 'account') {
       html = renderAccount();
       title = '마이페이지 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'templates') {
+      pageData = getAuthState().isAdmin ? await loadOrganizationTemplatesData() : { outer: [], inner: [] };
+      html = renderOrganizationTemplateEditor(pageData, params);
+      title = '조직도 템플릿 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'users') {
+      pageData = getAuthState().isAdmin ? await loadOrganizationUsers() : [];
+      html = renderOrganizationUsersAdmin(pageData);
+      title = '사용자 권한 관리 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'organization') {
+      pageData = getAuthState().isAdmin ? await loadOrganizationAdminData() : { profiles: [], details: [], nodes: [], edges: [], settings: null, outerTemplate: null, innerTemplate: null, users: [] };
+      html = renderOrganizationAdmin(pageData, params);
+      title = '조직도 관리 | 핑후컴퍼니';
     } else if (parts[0] === 'admin') {
-      const params = new URLSearchParams(location.hash.split('?')[1] || '');
       const mode = parts[1] === 'edit' ? 'edit' : 'new';
       adminPost = mode === 'edit' ? await getPost(Number(params.get('id'))) : null;
       html = renderAdmin(mode, adminPost);
@@ -86,10 +127,15 @@ async function render() {
     window.scrollTo(0, 0);
     if (parts[0] === 'login' || parts[0] === 'signup') bindAuth(parts[0], navigate);
     if (parts[0] === 'account') bindAccount({ navigate, onProfileChanged: updateAuthUI });
-    if (parts[0] === 'admin') bindAdmin(parts[1] === 'edit' ? 'edit' : 'new', adminPost, navigate);
+    if (parts[0] === 'company' && parts[1] === 'organization' && !parts[2]) bindOrganizationViewer();
+    if (parts[0] === 'account' && parts[1] === 'organization') bindOrganizationProfileEditor({ ...pageData, navigate });
+    if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'templates') bindOrganizationTemplateEditor({ data: pageData, params, refresh: render, navigate });
+    else if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'users') bindOrganizationUsersAdmin({ users: pageData, refresh: render });
+    else if (parts[0] === 'admin' && parts[1] === 'organization') bindOrganizationAdmin({ data: pageData, params, navigate, refresh: render });
+    else if (parts[0] === 'admin') bindAdmin(parts[1] === 'edit' ? 'edit' : 'new', adminPost, navigate);
   } catch (error) {
     console.error(error);
-    const text = error?.message === 'INVALID_POST_ID' ? '잘못된 게시글 주소입니다.' : errorMessage(error, '요청을 처리하지 못했습니다. 네트워크 상태를 확인해주세요.');
+    const text = error?.message === 'INVALID_POST_ID' ? '잘못된 게시글 주소입니다.' : error?.message === 'INVALID_ORG_PROFILE_ID' ? '잘못된 프로필 주소입니다.' : errorMessage(error, parts.includes('organization') ? '조직도를 불러오지 못했습니다.' : '요청을 처리하지 못했습니다. 네트워크 상태를 확인해주세요.');
     app.innerHTML = `<section class="shell status-page">${message(text, 'error')}<a href="#/">홈으로 돌아가기</a></section>`;
   }
 }
@@ -100,7 +146,7 @@ function updateAuthUI() {
   const utility = document.getElementById('auth-utility');
   const mobileAuth = document.getElementById('mobile-auth-links');
   const links = auth.loggedIn
-    ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>${auth.isAdmin ? '<a href="#/admin/new">관리</a>' : ''}<button type="button" data-global-logout>로그아웃</button>`
+    ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>${auth.canManageOrgProfile ? '<a href="#/account/organization">조직도 프로필</a>' : ''}${auth.isAdmin ? '<a href="#/admin/new">게시글 관리</a><a href="#/admin/organization">조직도 관리</a>' : ''}<button type="button" data-global-logout>로그아웃</button>`
     : '<a href="#/login">로그인</a><a href="#/signup">회원가입</a>';
   desktop.innerHTML = links;
   utility.innerHTML = auth.loggedIn ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>` : '<a href="#/login">로그인</a> · <a href="#/signup">회원가입</a>';
@@ -128,12 +174,23 @@ mobile.addEventListener('click', () => {
   toggle.setAttribute('aria-expanded', 'false');
 });
 
+let lastHash = location.hash || '#/';
+let restoringHash = false;
 window.addEventListener('hashchange', () => {
+  if (restoringHash) { restoringHash = false; return; }
+  if (!confirmLeaveOrganizationEditor() || !confirmLeaveOrganizationTemplateEditor()) {
+    restoringHash = true;
+    location.hash = lastHash;
+    return;
+  }
+  lastHash = location.hash;
   resetDetailState();
   render();
 });
 onAuthChange(updateAuthUI);
-initAuth().then(() => { updateAuthUI(); render(); }).catch((error) => {
+initDatabase().catch((error) => {
+  console.error('Supabase SDK 초기화 실패:', error);
+}).then(initAuth).then(() => { updateAuthUI(); render(); }).catch((error) => {
   console.error('인증 초기화 실패:', error);
   updateAuthUI();
   render();

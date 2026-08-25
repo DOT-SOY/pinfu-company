@@ -1,5 +1,5 @@
 import { subHero } from '../ui.js';
-import { COMPANY_PAGES, CEO_CONTENT, TALENT_VALUES, HISTORY_ITEMS, ORGANIZATION_TEAMS } from '../data/company-content.js';
+import { COMPANY_PAGES, CEO_CONTENT, TALENT_VALUES, HISTORY_ITEMS } from '../data/company-content.js';
 
 const menus = [
   ['ceo', 'CEO 인사말'],
@@ -8,7 +8,7 @@ const menus = [
   ['organization', '조직도']
 ];
 
-function sideNav(active) {
+export function renderCompanySideNav(active) {
   return `<aside class="side-nav"><strong>회사소개</strong>${menus.map((item) => `<a class="${active === item[0] ? 'active' : ''}" href="#/company/${item[0]}">${item[1]}<span>→</span></a>`).join('')}</aside>`;
 }
 
@@ -24,14 +24,9 @@ function renderHistory() {
   return `<div class="timeline">${HISTORY_ITEMS.map((item) => `<div><strong>${item[0]}</strong><ul><li>${item[1]}</li><li>${item[2]}</li></ul></div>`).join('')}</div>`;
 }
 
-function renderOrganization() {
-  return `<div class="org-chart"><div class="org-ceo">CEO<strong>대표이사</strong></div><div class="org-line"></div><div class="org-teams">${ORGANIZATION_TEAMS.map((team) => `<div><h3>${team[0]}</h3><span>${team[1]}</span><span>${team[2]}</span></div>`).join('')}</div></div>`;
-}
-
 function companyContent(slug) {
   if (slug === 'talent') return renderTalent();
   if (slug === 'history') return renderHistory();
-  if (slug === 'organization') return renderOrganization();
   return renderCeo();
 }
 
@@ -41,5 +36,5 @@ export function getCompanyTitle(slug) {
 
 export function renderCompany(slug = 'ceo') {
   const page = COMPANY_PAGES[slug] || COMPANY_PAGES.ceo;
-  return `${subHero(page.eyebrow, page.title, page.description)}<div class="shell sub-layout">${sideNav(slug)}<article class="content-panel">${companyContent(slug)}</article></div>`;
+  return `${subHero(page.eyebrow, page.title, page.description)}<div class="shell sub-layout">${renderCompanySideNav(slug)}<article class="content-panel">${companyContent(slug)}</article></div>`;
 }

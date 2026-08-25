@@ -9,7 +9,7 @@ export function renderAuth(kind) {
 export function renderAccount() {
   const auth = getAuthState();
   if (!auth.loggedIn) return renderAuth('login');
-  return `${subHero('MY ACCOUNT', '마이페이지', '계정 정보와 사이트에서 사용할 닉네임을 관리합니다.')}<section class="shell account-page"><form class="account-form" id="profile-form"><label>현재 닉네임<input name="nickname" maxlength="30" required value="${esc(auth.profile?.nickname || '')}"></label><p class="role-line">권한 <strong>${esc(auth.profile?.role || 'user')}</strong></p><div id="form-message"></div><button class="submit-button" type="submit">닉네임 변경</button><button class="secondary-button" id="account-logout" type="button">로그아웃</button></form></section>`;
+  return `${subHero('MY ACCOUNT', '마이페이지', '계정 정보와 사이트에서 사용할 닉네임을 관리합니다.')}<section class="shell account-page"><form class="account-form" id="profile-form"><label>현재 닉네임<input name="nickname" maxlength="30" required value="${esc(auth.profile?.nickname || '')}"></label><p class="role-line">권한 <strong>${esc(auth.profile?.role || 'user')}</strong></p>${auth.canManageOrgProfile?'<a class="account-feature-link" href="#/account/organization"><strong>조직도 프로필</strong><span>내 공개 프로필 작성 및 수정 →</span></a>':''}${auth.isAdmin?'<a class="account-feature-link" href="#/admin/organization"><strong>조직도 관리</strong><span>레이아웃과 템플릿 관리 →</span></a>':''}<div id="form-message"></div><button class="submit-button" type="submit">닉네임 변경</button><button class="secondary-button" id="account-logout" type="button">로그아웃</button></form></section>`;
 }
 
 export function bindAuth(kind, navigate) {
