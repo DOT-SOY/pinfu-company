@@ -164,19 +164,36 @@ function updateAuthUI() {
 
 const toggle = document.querySelector('.mobile-toggle');
 const mobile = document.getElementById('mobile-menu');
-toggle.addEventListener('click', () => {
-  const open = toggle.getAttribute('aria-expanded') === 'true';
-  toggle.setAttribute('aria-expanded', String(!open));
-  mobile.hidden = open;
-});
-mobile.addEventListener('click', () => {
+const closeMobileMenu = () => {
   mobile.hidden = true;
   toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-label', '전체 메뉴 열기');
+};
+toggle.addEventListener('click', () => {
+  const open = toggle.getAttribute('aria-expanded') === 'true';
+  if (open) closeMobileMenu();
+  else {
+    mobile.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+    toggle.setAttribute('aria-label', '전체 메뉴 닫기');
+  }
 });
+mobile.addEventListener('click', (event) => {
+  if (event.target.closest('a, button')) closeMobileMenu();
+});
+document.addEventListener('pointerdown', (event) => {
+  if (!mobile.hidden && !mobile.contains(event.target) && !toggle.contains(event.target)) closeMobileMenu();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !mobile.hidden) { closeMobileMenu(); toggle.focus(); }
+});
+window.matchMedia('(min-width: 761px)').addEventListener?.('change', closeMobileMenu);
+closeMobileMenu();
 
 let lastHash = location.hash || '#/';
 let restoringHash = false;
 window.addEventListener('hashchange', () => {
+  closeMobileMenu();
   if (restoringHash) { restoringHash = false; return; }
   if (!confirmLeaveOrganizationEditor() || !confirmLeaveOrganizationTemplateEditor()) {
     restoringHash = true;

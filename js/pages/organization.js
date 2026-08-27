@@ -56,7 +56,7 @@ export function renderOrganization(data) {
   const nodeMap = new Map(nodes.map((node) => [String(node.id), node]));
   const edges = (data.edges || []).filter((edge) => nodeMap.has(String(edge.source_node_id)) && nodeMap.has(String(edge.target_node_id)));
   const background = safeColor(canvas.background, '#eef4f8');
-  return `${subHero('ORGANIZATION', '조직도', '핑후컴퍼니를 움직이는 사람과 조직을 소개합니다.')}<div class="shell sub-layout organization-company-layout">${renderNavigator(nodes, data.profiles)}<article class="content-panel organization-public-page"><div class="organization-viewer" data-canvas-width="${width}" data-canvas-height="${height}"><div class="organization-viewer-toolbar"><span>조직도를 드래그하여 이동할 수 있습니다.</span><small>100% 보기</small></div><div class="organization-viewport"><div class="organization-canvas" style="width:${width}px;height:${height}px;background:${background}"><svg class="organization-edge-layer" width="${width}" height="${height}" aria-hidden="true">${edges.map((edge) => `<path d="${orthogonalPath(nodeMap.get(String(edge.source_node_id)), nodeMap.get(String(edge.target_node_id)))}"></path>`).join('')}</svg>${nodes.map((node) => renderNode(node, data.profiles, outerSchema)).join('')}</div>${nodes.length ? '' : '<div class="organization-empty">아직 공개된 조직도 항목이 없습니다.</div>'}</div></div></article></div>`;
+  return `${subHero('ORGANIZATION', '조직도', '핑후컴퍼니를 움직이는 사람과 조직을 소개합니다.')}<div class="shell sub-layout organization-company-layout">${renderNavigator(nodes, data.profiles)}<article class="content-panel organization-public-page"><div class="organization-viewer" data-canvas-width="${width}" data-canvas-height="${height}"><div class="organization-viewer-toolbar"><span>조직도를 드래그하여 이동할 수 있습니다.</span></div><div class="organization-viewport"><div class="organization-canvas" style="width:${width}px;height:${height}px;background:${background}"><svg class="organization-edge-layer" width="${width}" height="${height}" aria-hidden="true">${edges.map((edge) => `<path d="${orthogonalPath(nodeMap.get(String(edge.source_node_id)), nodeMap.get(String(edge.target_node_id)))}"></path>`).join('')}</svg>${nodes.map((node) => renderNode(node, data.profiles, outerSchema)).join('')}</div>${nodes.length ? '' : '<div class="organization-empty">아직 공개된 조직도 항목이 없습니다.</div>'}</div></div></article></div>`;
 }
 
 export function bindOrganizationViewer() {
@@ -65,7 +65,8 @@ export function bindOrganizationViewer() {
   const viewport = viewer.querySelector('.organization-viewport');
   const canvas = viewer.querySelector('.organization-canvas');
   const navigator = document.querySelector('.organization-navigator');
-  let x = 0, y = 0, pan = null, smoothTimer = null, highlightTimer = null;
+  const dragThreshold = 7;
+  let x = 0, y = 0, pan = null, smoothTimer = null, highlightTimer = null, suppressedProfile = null, suppressProfileClickUntil = 0;
   const apply = (smooth = false) => {
     window.clearTimeout(smoothTimer);
     canvas.classList.toggle('is-centering', smooth);
@@ -91,21 +92,67 @@ export function bindOrganizationViewer() {
     }
   };
 
+  viewer.querySelectorAll('img').forEach((image) => { image.draggable = false; });
+  viewer.addEventListener('dragstart', (event) => event.preventDefault());
+  viewer.addEventListener('selectstart', (event) => event.preventDefault());
+
   viewport.addEventListener('pointerdown', (event) => {
-    if (event.target.closest('.organization-profile-node')) return;
+    if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0) || pan) return;
     canvas.classList.remove('is-centering');
-    pan = { px: event.clientX, py: event.clientY, x, y };
-    viewport.setPointerCapture(event.pointerId);
+    const profile = event.target.closest('.organization-profile-node');
+    pan = { pointerId: event.pointerId, px: event.clientX, py: event.clientY, x, y, profile, dragged: false, captured: false };
+    if (!profile) {
+      event.preventDefault();
+      viewport.setPointerCapture(event.pointerId);
+      pan.captured = true;
+    }
   });
   viewport.addEventListener('pointermove', (event) => {
-    if (!pan) return;
-    x = pan.x + event.clientX - pan.px;
-    y = pan.y + event.clientY - pan.py;
+    if (!pan || event.pointerId !== pan.pointerId) return;
+    const dx = event.clientX - pan.px;
+    const dy = event.clientY - pan.py;
+    if (!pan.dragged) {
+      if (Math.hypot(dx, dy) < dragThreshold) return;
+      pan.dragged = true;
+      viewport.classList.add('is-panning');
+      if (!pan.captured) {
+        viewport.setPointerCapture(event.pointerId);
+        pan.captured = true;
+      }
+    }
+    event.preventDefault();
+    x = pan.x + dx;
+    y = pan.y + dy;
     apply();
   });
-  const stopPan = () => { pan = null; };
+  const stopPan = (event, cancelled = false) => {
+    if (!pan || event.pointerId !== pan.pointerId) return;
+    const finished = pan;
+    pan = null;
+    viewport.classList.remove('is-panning');
+    if (finished.captured && viewport.hasPointerCapture?.(finished.pointerId)) viewport.releasePointerCapture(finished.pointerId);
+    if (!cancelled && finished.dragged && finished.profile) {
+      suppressedProfile = finished.profile;
+      suppressProfileClickUntil = performance.now() + 350;
+      event.preventDefault();
+    } else if (!cancelled && !finished.dragged && finished.profile && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+      const href = finished.profile.getAttribute('href');
+      if (href?.startsWith('#/')) {
+        event.preventDefault();
+        window.location.hash = href;
+      }
+    }
+  };
   viewport.addEventListener('pointerup', stopPan);
-  viewport.addEventListener('pointercancel', stopPan);
+  viewport.addEventListener('pointercancel', (event) => stopPan(event, true));
+  viewport.addEventListener('lostpointercapture', (event) => stopPan(event, true));
+  viewport.addEventListener('click', (event) => {
+    const profile = event.target.closest('.organization-profile-node');
+    if (profile && profile === suppressedProfile && performance.now() < suppressProfileClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
 
   navigator?.addEventListener('click', (event) => {
     const drawer = event.target.closest('[data-org-nav-drawer]');
