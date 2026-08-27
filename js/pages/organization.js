@@ -1,28 +1,62 @@
 import { subHero, esc } from '../ui.js';
 import { normalizeCanvas, normalizeOuterSchema } from '../organization-schema.js';
+import { getItemBounds } from '../organization-editor/alignment.js';
 import { orthogonalPath, renderOuterCard, safeBorder, safeColor } from '../organization-view.js';
-import { renderCompanySideNav } from './company.js';
+
+const nodeOrder = (a, b) => (Number(a.position_y) || 0) - (Number(b.position_y) || 0) || (Number(a.position_x) || 0) - (Number(b.position_x) || 0);
 
 function renderNode(node, profiles, outerSchema) {
   const style = `left:${Number(node.position_x) || 0}px;top:${Number(node.position_y) || 0}px;width:${Number(node.width) || 180}px;height:${Number(node.height) || 100}px;z-index:${Number(node.z_index) || 0}`;
   if (node.node_type === 'PROFILE') {
     const profile = profiles.find((item) => Number(item.id) === Number(node.profile_id));
     if (!profile) return '';
-    return `<a class="organization-node organization-profile-node" data-node-id="${node.id}" href="#/company/organization/${profile.id}" style="${style}">${renderOuterCard(profile, outerSchema, { width: node.width, height: node.height })}</a>`;
+    return `<a class="organization-node organization-profile-node" data-node-id="${esc(node.id)}" href="#/company/organization/${profile.id}" style="${style}">${renderOuterCard(profile, outerSchema, { width: node.width, height: node.height })}</a>`;
   }
   const config = node.config || {};
-  if (node.node_type === 'GROUP') return `<div class="organization-node organization-group-node" data-node-id="${node.id}" style="${style};background:${safeColor(config.background, 'rgba(255,255,255,.55)')};border:${safeBorder(config.border, '1px solid #a8bfcd')}"><strong>${esc(config.label || '그룹')}</strong></div>`;
-  return `<div class="organization-node organization-label-node" data-node-id="${node.id}" style="${style};background:${safeColor(config.background)};border:${safeBorder(config.border, 'none')};font-size:${Math.max(10, Number(config.fontSize) || 18)}px;font-weight:${config.fontWeight === 'bold' ? 700 : Number(config.fontWeight) || 700};text-align:${['left','center','right'].includes(config.align) ? config.align : 'center'}">${esc(config.text || '텍스트')}</div>`;
+  if (node.node_type === 'GROUP') return `<div class="organization-node organization-group-node" data-node-id="${esc(node.id)}" style="${style};background:${safeColor(config.background, 'rgba(255,255,255,.55)')};border:${safeBorder(config.border, '1px solid #a8bfcd')}"><strong>${esc(config.label || '그룹')}</strong></div>`;
+  return `<div class="organization-node organization-label-node" data-node-id="${esc(node.id)}" style="${style};background:${safeColor(config.background)};border:${safeBorder(config.border, 'none')};font-size:${Math.max(10, Number(config.fontSize) || 18)}px;font-weight:${config.fontWeight === 'bold' ? 700 : Number(config.fontWeight) || 700};text-align:${['left','center','right'].includes(config.align) ? config.align : 'center'}">${esc(config.text || '텍스트')}</div>`;
+}
+
+function profileNavButton(node, profiles) {
+  const profile = profiles.find((item) => Number(item.id) === Number(node.profile_id));
+  return profile ? `<button type="button" data-org-nav-target="${esc(node.id)}" data-org-nav-profile>${esc(profile.name)}</button>` : '';
+}
+
+function renderNavigator(nodes, profiles) {
+  const groups = nodes.filter((node) => node.node_type === 'GROUP').sort(nodeOrder);
+  const profileNodes = nodes.filter((node) => node.node_type === 'PROFILE').sort(nodeOrder);
+  const groupIds = new Set(groups.map((group) => String(group.id)));
+  const grouped = new Map(groups.map((group) => [String(group.id), []]));
+  const unclassified = [];
+  profileNodes.forEach((node) => {
+    const parentId = node.parent_node_id == null ? '' : String(node.parent_node_id);
+    if (groupIds.has(parentId)) grouped.get(parentId).push(node);
+    else unclassified.push(node);
+  });
+  const sections = groups.map((group) => {
+    const key = `group-${group.id}`;
+    const members = grouped.get(String(group.id));
+    return `<section class="organization-navigator-group"><div><button type="button" class="organization-navigator-arrow" data-org-nav-toggle="${esc(key)}" aria-expanded="true" aria-label="${esc(group.config?.label || '그룹')} 목록 접기">▼</button><button type="button" class="organization-navigator-target" data-org-nav-target="${esc(group.id)}">${esc(group.config?.label || '그룹')}</button></div><div class="organization-navigator-members" data-org-nav-members="${esc(key)}">${members.map((node) => profileNavButton(node, profiles)).join('') || '<span>등록된 구성원이 없습니다.</span>'}</div></section>`;
+  }).join('');
+  const unclassifiedSection = unclassified.length ? `<section class="organization-navigator-group"><div><button type="button" class="organization-navigator-arrow" data-org-nav-toggle="unclassified" aria-expanded="true" aria-label="미분류 목록 접기">▼</button><strong>미분류</strong></div><div class="organization-navigator-members" data-org-nav-members="unclassified">${unclassified.map((node) => profileNavButton(node, profiles)).join('')}</div></section>` : '';
+  return `<aside class="organization-navigator"><a class="organization-navigator-back" href="#/company/ceo">← 회사소개</a><button type="button" class="organization-navigator-mobile-toggle" data-org-nav-drawer aria-expanded="false">조직 바로가기 <span>＋</span></button><div class="organization-navigator-panel" data-org-nav-panel><h2>조직 바로가기</h2>${sections}${unclassifiedSection}${!groups.length&&!unclassified.length?'<p>표시할 조직이 없습니다.</p>':''}</div></aside>`;
 }
 
 export function renderOrganization(data) {
   const canvas = normalizeCanvas(data.canvas);
   const outerSchema = normalizeOuterSchema(data.outerTemplate?.schema_data);
-  const nodes = (data.nodes || []).filter((node) => node.node_type !== 'PROFILE' || data.profiles.some((profile) => Number(profile.id) === Number(node.profile_id)));
-  const nodeMap = new Map(nodes.map((node) => [Number(node.id), node]));
-  const edges = (data.edges || []).filter((edge) => nodeMap.has(Number(edge.source_node_id)) && nodeMap.has(Number(edge.target_node_id)));
-  const grid = canvas.showGrid ? `background-color:${safeColor(canvas.background, '#eef4f8')};background-image:linear-gradient(#cbdbe4 1px,transparent 1px),linear-gradient(90deg,#cbdbe4 1px,transparent 1px);background-size:${canvas.gridSize}px ${canvas.gridSize}px` : `background:${safeColor(canvas.background, '#eef4f8')}`;
-  return `${subHero('ORGANIZATION', '조직도', '핑후컴퍼니를 움직이는 사람과 조직을 소개합니다.')}<div class="shell sub-layout organization-company-layout">${renderCompanySideNav('organization')}<article class="content-panel organization-public-page"><div class="organization-viewer" data-canvas-width="${canvas.width}" data-canvas-height="${canvas.height}"><div class="organization-viewer-toolbar"><span>마우스로 이동하고 확대할 수 있습니다.</span><div><button data-org-view="out" aria-label="축소">−</button><output data-org-zoom>100%</output><button data-org-view="in" aria-label="확대">＋</button><button data-org-view="fit">전체 보기</button></div></div><div class="organization-viewport"><div class="organization-canvas" style="width:${canvas.width}px;height:${canvas.height}px;${grid}"><svg class="organization-edge-layer" width="${canvas.width}" height="${canvas.height}" aria-hidden="true">${edges.map((edge) => `<path d="${orthogonalPath(nodeMap.get(Number(edge.source_node_id)), nodeMap.get(Number(edge.target_node_id)))}"></path>`).join('')}</svg>${nodes.map((node) => renderNode(node, data.profiles, outerSchema)).join('')}</div>${nodes.length ? '' : '<div class="organization-empty">아직 공개된 조직도 항목이 없습니다.</div>'}</div></div></article></div>`;
+  const sourceNodes = (data.nodes || []).filter((node) => node.node_type !== 'PROFILE' || data.profiles.some((profile) => Number(profile.id) === Number(node.profile_id)));
+  const bounds = getItemBounds(sourceNodes, { xKey: 'position_x', yKey: 'position_y' });
+  const padding = 90;
+  const offsetX = bounds ? padding - bounds.left : 0;
+  const offsetY = bounds ? padding - bounds.top : 0;
+  const width = bounds ? Math.max(720, Math.ceil(bounds.width + padding * 2)) : 720;
+  const height = bounds ? Math.max(520, Math.ceil(bounds.height + padding * 2)) : 520;
+  const nodes = sourceNodes.map((node) => ({ ...node, position_x: (Number(node.position_x) || 0) + offsetX, position_y: (Number(node.position_y) || 0) + offsetY }));
+  const nodeMap = new Map(nodes.map((node) => [String(node.id), node]));
+  const edges = (data.edges || []).filter((edge) => nodeMap.has(String(edge.source_node_id)) && nodeMap.has(String(edge.target_node_id)));
+  const background = safeColor(canvas.background, '#eef4f8');
+  return `${subHero('ORGANIZATION', '조직도', '핑후컴퍼니를 움직이는 사람과 조직을 소개합니다.')}<div class="shell sub-layout organization-company-layout">${renderNavigator(nodes, data.profiles)}<article class="content-panel organization-public-page"><div class="organization-viewer" data-canvas-width="${width}" data-canvas-height="${height}"><div class="organization-viewer-toolbar"><span>조직도를 드래그하여 이동할 수 있습니다.</span><small>100% 보기</small></div><div class="organization-viewport"><div class="organization-canvas" style="width:${width}px;height:${height}px;background:${background}"><svg class="organization-edge-layer" width="${width}" height="${height}" aria-hidden="true">${edges.map((edge) => `<path d="${orthogonalPath(nodeMap.get(String(edge.source_node_id)), nodeMap.get(String(edge.target_node_id)))}"></path>`).join('')}</svg>${nodes.map((node) => renderNode(node, data.profiles, outerSchema)).join('')}</div>${nodes.length ? '' : '<div class="organization-empty">아직 공개된 조직도 항목이 없습니다.</div>'}</div></div></article></div>`;
 }
 
 export function bindOrganizationViewer() {
@@ -30,17 +64,78 @@ export function bindOrganizationViewer() {
   if (!viewer) return;
   const viewport = viewer.querySelector('.organization-viewport');
   const canvas = viewer.querySelector('.organization-canvas');
-  const output = viewer.querySelector('[data-org-zoom]');
-  let scale = 1, x = 0, y = 0, pan = null;
-  const apply = () => { canvas.style.transform = `translate(${x}px,${y}px) scale(${scale})`; output.value = `${Math.round(scale * 100)}%`; };
-  const fit = () => { const pad = 28; scale = Math.min((viewport.clientWidth-pad*2)/Number(viewer.dataset.canvasWidth),(viewport.clientHeight-pad*2)/Number(viewer.dataset.canvasHeight),1); scale = Math.max(.2, scale); x=(viewport.clientWidth-Number(viewer.dataset.canvasWidth)*scale)/2;y=(viewport.clientHeight-Number(viewer.dataset.canvasHeight)*scale)/2;apply(); };
-  const zoom = (amount, cx=viewport.clientWidth/2, cy=viewport.clientHeight/2) => { const previous=scale;scale=Math.min(2,Math.max(.2,scale+amount));x=cx-(cx-x)*(scale/previous);y=cy-(cy-y)*(scale/previous);apply(); };
-  viewer.querySelector('[data-org-view="in"]').addEventListener('click',()=>zoom(.1));
-  viewer.querySelector('[data-org-view="out"]').addEventListener('click',()=>zoom(-.1));
-  viewer.querySelector('[data-org-view="fit"]').addEventListener('click',fit);
-  viewport.addEventListener('wheel',(event)=>{event.preventDefault();const rect=viewport.getBoundingClientRect();zoom(event.deltaY<0?.1:-.1,event.clientX-rect.left,event.clientY-rect.top);},{passive:false});
-  viewport.addEventListener('pointerdown',(event)=>{if(event.target.closest('.organization-profile-node'))return;pan={px:event.clientX,py:event.clientY,x,y};viewport.setPointerCapture(event.pointerId);});
-  viewport.addEventListener('pointermove',(event)=>{if(!pan)return;x=pan.x+event.clientX-pan.px;y=pan.y+event.clientY-pan.py;apply();});
-  viewport.addEventListener('pointerup',()=>{pan=null;});
-  requestAnimationFrame(fit);
+  const navigator = document.querySelector('.organization-navigator');
+  let x = 0, y = 0, pan = null, smoothTimer = null, highlightTimer = null;
+  const apply = (smooth = false) => {
+    window.clearTimeout(smoothTimer);
+    canvas.classList.toggle('is-centering', smooth);
+    canvas.style.transform = `translate(${x}px,${y}px)`;
+    if (smooth) smoothTimer = window.setTimeout(() => canvas.classList.remove('is-centering'), 420);
+  };
+  const centerCanvas = () => {
+    x = (viewport.clientWidth - Number(viewer.dataset.canvasWidth)) / 2;
+    y = (viewport.clientHeight - Number(viewer.dataset.canvasHeight)) / 2;
+    apply();
+  };
+  const centerNode = (id, highlight = false) => {
+    const node = canvas.querySelector(`[data-node-id="${CSS.escape(String(id))}"]`);
+    if (!node) return;
+    x = viewport.clientWidth / 2 - (Number.parseFloat(node.style.left) + Number.parseFloat(node.style.width) / 2);
+    y = viewport.clientHeight / 2 - (Number.parseFloat(node.style.top) + Number.parseFloat(node.style.height) / 2);
+    apply(true);
+    if (highlight) {
+      window.clearTimeout(highlightTimer);
+      canvas.querySelectorAll('.organization-profile-highlight').forEach((item) => item.classList.remove('organization-profile-highlight'));
+      node.classList.add('organization-profile-highlight');
+      highlightTimer = window.setTimeout(() => node.classList.remove('organization-profile-highlight'), 1100);
+    }
+  };
+
+  viewport.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.organization-profile-node')) return;
+    canvas.classList.remove('is-centering');
+    pan = { px: event.clientX, py: event.clientY, x, y };
+    viewport.setPointerCapture(event.pointerId);
+  });
+  viewport.addEventListener('pointermove', (event) => {
+    if (!pan) return;
+    x = pan.x + event.clientX - pan.px;
+    y = pan.y + event.clientY - pan.py;
+    apply();
+  });
+  const stopPan = () => { pan = null; };
+  viewport.addEventListener('pointerup', stopPan);
+  viewport.addEventListener('pointercancel', stopPan);
+
+  navigator?.addEventListener('click', (event) => {
+    const drawer = event.target.closest('[data-org-nav-drawer]');
+    if (drawer) {
+      const open = drawer.getAttribute('aria-expanded') === 'true';
+      drawer.setAttribute('aria-expanded', String(!open));
+      drawer.querySelector('span').textContent = open ? '＋' : '−';
+      navigator.querySelector('[data-org-nav-panel]').classList.toggle('open', !open);
+      return;
+    }
+    const toggle = event.target.closest('[data-org-nav-toggle]');
+    if (toggle) {
+      const members = navigator.querySelector(`[data-org-nav-members="${CSS.escape(toggle.dataset.orgNavToggle)}"]`);
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      toggle.setAttribute('aria-label', toggle.getAttribute('aria-label').replace(expanded ? '접기' : '펼치기', expanded ? '펼치기' : '접기'));
+      toggle.textContent = expanded ? '▶' : '▼';
+      if (members) members.hidden = expanded;
+      return;
+    }
+    const target = event.target.closest('[data-org-nav-target]');
+    if (target) {
+      centerNode(target.dataset.orgNavTarget, target.hasAttribute('data-org-nav-profile'));
+      if (window.matchMedia('(max-width: 760px)').matches) {
+        navigator.querySelector('[data-org-nav-panel]').classList.remove('open');
+        const drawerButton = navigator.querySelector('[data-org-nav-drawer]');
+        drawerButton.setAttribute('aria-expanded', 'false');
+        drawerButton.querySelector('span').textContent = '＋';
+      }
+    }
+  });
+  requestAnimationFrame(centerCanvas);
 }

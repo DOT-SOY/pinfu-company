@@ -1,7 +1,7 @@
 export const DEFAULT_CANVAS = { width: 1600, height: 900, gridSize: 20, background: '#eef4f8', showGrid: true, snap: true };
 
 export const DEFAULT_OUTER_SCHEMA = {
-  card: { width: 190, height: 230, background: '#ffffff', border: '1px solid #cbdbe4', borderRadius: 4, padding: 12 },
+  card: { width: 190, height: 230, background: '#ffffff', border: '1px solid #cbdbe4', borderRadius: 4, padding: 12, customCss: '' },
   fields: [
     { id: 'department', source: 'profile', key: 'department', type: 'text', label: '소속', visible: true, x: 12, y: 12, width: 166, height: 24, fontSize: 11, fontWeight: 700, align: 'left' },
     { id: 'image_url', source: 'profile', key: 'image_url', type: 'image', label: '사진', visible: true, x: 40, y: 44, width: 110, height: 110, fit: 'cover', position: 'center' },
@@ -46,16 +46,32 @@ export function normalizeOuterSchema(value) {
       ...DEFAULT_OUTER_SCHEMA.card,
       ...card,
       width: Math.max(120, number(card.width, DEFAULT_OUTER_SCHEMA.card.width)),
-      height: Math.max(120, number(card.height, DEFAULT_OUTER_SCHEMA.card.height))
+      height: Math.max(120, number(card.height, DEFAULT_OUTER_SCHEMA.card.height)),
+      customCss: String(card.customCss || '').slice(0, 4000)
     },
-    fields: sourceFields.map((field, index) => ({
-      ...DEFAULT_OUTER_SCHEMA.fields[index] || {},
-      ...field,
-      id: String(field.id || field.key || `field_${index}`),
-      visible: field.visible !== false,
-      x: number(field.x, 0), y: number(field.y, 0),
-      width: Math.max(20, number(field.width, 80)), height: Math.max(18, number(field.height, 24))
-    }))
+    fields: sourceFields.map((field, index) => {
+      const normalized = { ...DEFAULT_OUTER_SCHEMA.fields[index] || {}, ...field };
+      const source = normalized.source === 'static' ? 'static' : 'profile';
+      const result = {
+        ...normalized,
+        id: String(normalized.id || normalized.key || `field_${index}`),
+        source,
+        key: source === 'static' ? '' : String(normalized.key || normalized.id || `field_${index}`),
+        type: source === 'static' ? 'text' : normalized.type === 'image' ? 'image' : 'text',
+        text: source === 'static' ? String(normalized.text || '') : undefined,
+        visible: normalized.visible !== false,
+        x: number(normalized.x, 0), y: number(normalized.y, 0),
+        width: Math.max(20, number(field.width ?? field.w ?? normalized.width, 80)),
+        height: Math.max(18, number(field.height ?? field.h ?? normalized.height, 24)),
+        color: String(normalized.color || ''),
+        background: String(normalized.background || ''),
+        border: String(normalized.border || ''),
+        customCss: String(normalized.customCss || '').slice(0, 4000)
+      };
+      delete result.w;
+      delete result.h;
+      return result;
+    })
   };
 }
 
@@ -71,8 +87,9 @@ export function normalizeInnerSchema(value) {
   })) };
 }
 
-export function createStableFieldId() {
-  return `fld_${globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(16).slice(2)}`}`;
+export function createStableFieldId(prefix = 'fld') {
+  const safePrefix = String(prefix).replace(/[^a-z0-9_-]/gi, '') || 'fld';
+  return `${safePrefix}_${globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(16).slice(2)}`}`;
 }
 
 export function isSafeImageUrl(value) {

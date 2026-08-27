@@ -73,7 +73,15 @@ export class OrganizationEditorState {
   }
 
   deleteNode(id) {
-    this.mutate(() => { this.nodes = this.nodes.filter((node) => String(node.id) !== String(id)); this.edges = this.edges.filter((edge) => String(edge.source_node_id) !== String(id) && String(edge.target_node_id) !== String(id)); });
+    this.deleteNodes([id]);
+  }
+
+  deleteNodes(ids) {
+    const removed = new Set([...ids].map(String));
+    this.mutate(() => {
+      this.nodes = this.nodes.filter((node) => !removed.has(String(node.id)));
+      this.edges = this.edges.filter((edge) => !removed.has(String(edge.source_node_id)) && !removed.has(String(edge.target_node_id)));
+    });
   }
 
   deleteEdge(id) { this.mutate(() => { this.edges = this.edges.filter((edge) => String(edge.id) !== String(id)); }); }

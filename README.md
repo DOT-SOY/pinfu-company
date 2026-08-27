@@ -32,20 +32,25 @@ python -m http.server 8000
 
 - `org_profiles`: 이름, 부서, 직급, 외부 이미지 URL과 Owner를 저장합니다.
 - `org_profile_details`: INNER custom field 값을 `field_values` JSON으로 저장합니다. 프로필 생성 Trigger가 행을 생성하므로 프런트에서는 UPDATE만 합니다.
-- `org_nodes`: Canvas의 PROFILE, GROUP, LABEL 노드 위치·크기·구조화 설정을 저장합니다.
+- `org_nodes`: Canvas의 PROFILE, GROUP, LABEL 노드 위치·크기·구조화 설정을 저장합니다. PROFILE의 `parent_node_id`는 소속 GROUP을 가리키며 좌표나 Edge와 독립적으로 관리됩니다.
 - `org_edges`: 노드 사이 연결선과 구조화 설정을 저장합니다.
 - `org_templates`: OUTER 카드 디자인과 INNER 상세 양식의 구조화된 `schema_data`를 저장합니다. HTML/JavaScript 문자열을 실행하지 않습니다.
 - `org_settings`: `key = canvas`에 전체 Canvas 크기, 배경, Grid, Snap 설정을 저장합니다.
 
 `org_profiles`에 등록된 사람은 자동으로 공개되지 않습니다. Admin이 해당 프로필을 PROFILE node로 Canvas에 배치해야 공개 조직도에 나타납니다.
 
+공개 Viewer는 카드 가독성을 위해 항상 100% 크기로 표시합니다. 빈 Canvas를 드래그해 이동하고, 왼쪽 `조직 바로가기`에서 GROUP 또는 PROFILE을 선택해 해당 위치를 중앙으로 이동합니다. Navigator의 접기/펼치기는 목록에만 적용되며 Canvas 데이터는 변경하지 않습니다.
+
 ## Admin 조직도 GUI
 
-- 노드 클릭 선택 및 Canvas 직접 Drag
+- 클릭으로 단일 선택, Shift/Ctrl/Cmd+클릭으로 다중 선택 및 선택 요소 함께 Drag
 - 선택 노드 모서리 Handle 직접 Resize
 - 빈 Canvas Drag Pan
 - 버튼·Wheel Zoom과 Fit
 - Grid 표시, Grid size, Snap-to-grid
+- PROFILE Property Panel에서 소속 GROUP 지정
+- GROUP 이동 시 소속 PROFILE 동반 이동
+- 다중 선택 왼쪽/가운데/오른쪽·위/가운데/아래 정렬, 3개 이상 동일 간격, 현재 화면 중앙 이동
 - GROUP/LABEL 생성과 Property Panel 편집
 - 미배치 프로필 Drag & Drop 또는 배치 버튼
 - 연결선 모드에서 Source → Target 클릭으로 직각 Edge 생성
@@ -58,7 +63,9 @@ python -m http.server 8000
 
 ### OUTER
 
-공개 조직도의 PROFILE 카드 공통 디자인입니다. 이름, 소속, 직급, 이미지 필드를 Preview 위에서 직접 Drag하며 선택 필드의 Handle로 Resize합니다. Property Panel에서 표시 여부, 정렬, 글자 크기/굵기, 이미지 fit/position, 카드 크기·배경·테두리·radius·padding을 조정합니다.
+공개 조직도의 PROFILE 카드 공통 디자인입니다. 이름, 소속, 직급, 이미지 필드를 Preview 위에서 직접 Drag하며 선택 필드의 Handle로 Resize합니다. `＋ 텍스트`로 프로필 데이터와 무관한 `STATIC_TEXT` 요소를 추가할 수 있습니다. Shift/Ctrl/Cmd+클릭으로 여러 필드를 선택해 함께 이동하거나 정렬·동일 간격·카드 기준 중앙 배치를 할 수 있습니다. Property Panel에서 표시 여부, 텍스트 내용·정렬·색상, 글자 크기/굵기, 배경·테두리, 이미지 fit/position, 카드 크기·배경·테두리·radius·padding을 조정합니다.
+
+카드와 각 OUTER 요소에는 `property:value` 선언만 받는 고급 CSS 입력란이 있습니다. 허용 목록에 포함된 선언만 파싱하여 기본 GUI 스타일 뒤에 적용하고, `@import`, `url()`, `expression()`, `javascript:`, `<script>`, `<style>`, `position` 등 위험하거나 레이아웃 범위를 벗어나는 선언은 무시합니다. 원문은 OUTER `schema_data` JSON에만 저장하며 동적 stylesheet나 `<style>` 요소를 만들지 않습니다.
 
 ### INNER
 
@@ -76,6 +83,7 @@ Supabase Storage와 파일 업로드를 사용하지 않습니다. `input type="
 - `js/organization-schema.js`: Canvas·OUTER·INNER schema 정규화, stable ID, URL 검사
 - `js/organization-view.js`: 카드, 상세 field, Edge 안전 렌더링
 - `js/organization-editor/state.js`: Canvas Local State와 Undo/Redo
+- `js/organization-editor/alignment.js`: Node와 OUTER field의 Bounding Box·정렬·분배 계산
 - `js/pages/organization.js`: 공개 Viewer
 - `js/pages/organization-detail.js`: 상세 프로필
 - `js/pages/organization-profile-editor.js`: 자기 프로필 입력

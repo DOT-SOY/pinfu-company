@@ -73,7 +73,7 @@ export async function setUserRole(userId, role) {
 }
 
 function nodePayload(node, idMap = new Map()) {
-  const parent = node.parent_node_id == null ? null : idMap.get(String(node.parent_node_id)) || node.parent_node_id;
+  const parent = node.node_type === 'PROFILE' && node.parent_node_id != null ? idMap.get(String(node.parent_node_id)) || node.parent_node_id : null;
   return {
     node_type: node.node_type,
     profile_id: node.node_type === 'PROFILE' ? Number(node.profile_id) : null,
@@ -107,7 +107,8 @@ export async function saveOrgLayout({ nodes, edges, settings }) {
   if (removeNodeIds.length) await result(client.from('org_nodes').delete().in('id', removeNodeIds));
 
   const idMap = new Map();
-  for (const node of nodes) {
+  const orderedNodes = [...nodes].sort((a, b) => (a.node_type === 'GROUP' ? 0 : 1) - (b.node_type === 'GROUP' ? 0 : 1));
+  for (const node of orderedNodes) {
     if (Number.isFinite(Number(node.id))) {
       await updateOrgNode(Number(node.id), nodePayload(node, idMap));
       idMap.set(String(node.id), Number(node.id));
