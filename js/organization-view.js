@@ -28,7 +28,9 @@ export function renderOuterCard(profile, schemaValue, size = {}) {
   const cardStyle = `width:${width}px;height:${height}px;background:${safeColor(schema.card.background, '#fff')};border:${safeBorder(schema.card.border)};border-radius:${Math.max(0, Number(schema.card.borderRadius) || 0)}px;padding:${Math.max(0, Number(schema.card.padding) || 0)}px`;
   const fields = schema.fields.filter((field) => field.visible !== false).map((field) => {
     const value = profile?.[field.key] || '';
-    const style = `left:${field.x * scaleX}px;top:${field.y * scaleY}px;width:${field.width * scaleX}px;height:${field.height * scaleY}px;text-align:${alignments.has(field.align) ? field.align : 'left'};font-size:${Math.max(8, Number(field.fontSize) || 13)}px;font-weight:${String(field.fontWeight || 400).replace(/[^\d]|^(?=0*$)/g, '') || 400}`;
+    const align = alignments.has(field.align) ? field.align : 'left';
+    const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+    const style = `left:${field.x * scaleX}px;top:${field.y * scaleY}px;width:${field.width * scaleX}px;height:${field.height * scaleY}px;text-align:${align};justify-content:${justify};font-size:${Math.max(8, Number(field.fontSize) || 13)}px;font-weight:${String(field.fontWeight || 400).replace(/[^\d]|^(?=0*$)/g, '') || 400}`;
     if (field.type === 'image' || field.key === 'image_url') {
       const src = safeImage(value);
       return `<div class="organization-card-field organization-card-image" data-field-id="${esc(field.id)}" style="${style}">${src ? `<img src="${esc(src)}" alt="${esc(profile?.name || '')}" style="object-fit:${fits.has(field.fit) ? field.fit : 'cover'};object-position:${positions.has(field.position) ? field.position : 'center'}">` : '<span class="organization-image-placeholder" aria-hidden="true">P</span>'}</div>`;
