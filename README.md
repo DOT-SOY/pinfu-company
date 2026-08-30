@@ -25,6 +25,11 @@ python -m http.server 8000
 - `#/admin/organization?tab=profiles`: Admin 프로필 관리
 - `#/admin/organization/templates`: OUTER/INNER Template GUI
 - `#/admin/organization/users`: 사용자 역할 관리
+- `#/admin/characters`: 관리자 캐릭터 수치·스킬 관리 (설치: CHARACTER_ADMIN.md)
+- `#/admin/skills`: 공유 스킬 생성·효과/조건 관리 (설치: SKILL_ADMIN.md)
+- `#/admin/actions`: 행동 생성·기본 컨디션/스탯 효과·조건 관리 (설치: ACTION_ADMIN.md)
+- `#/admin/stats`: 공통 스탯 정의 생성·수정 (이번 보완 설치: ADMIN_REFINEMENTS.md)
+- 스킬 효과의 대상 명령 옆에서 새 행동 명령 등록 가능 (추가 설치: SKILL_COMMAND_ADMIN.md)
 
 기존 홈, 회사소개, 채용정보, 보도자료, 회사자료, 게시글/댓글, 로그인/회원가입, 마이페이지, 게시글 Admin route는 그대로 유지됩니다.
 

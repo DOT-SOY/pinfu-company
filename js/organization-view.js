@@ -11,7 +11,7 @@ const customCssProperties = new Set([
   'font-family', 'font-size', 'font-style', 'font-weight', 'letter-spacing', 'line-height',
   'text-align', 'text-decoration', 'text-transform', 'white-space', 'word-break',
   'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-  'align-items', 'justify-content'
+  'align-items', 'justify-content', 'z-index'
 ]);
 const forbiddenCss = /@import|\burl\b|(?:image-set|paint|element)\s*\(|expression\s*\(|javascript\s*:|<\s*\/?\s*(?:script|style)\b|position\s*:\s*fixed/i;
 const safeCssValue = /^[\w\s#.,%()+\-/'"]+$/;
@@ -40,7 +40,8 @@ export function parseSafeCssDeclarations(value) {
     if (colon < 1 || forbiddenCss.test(declaration)) { rejected.push(declaration); return; }
     const property = declaration.slice(0, colon).trim().toLowerCase();
     const cssValue = declaration.slice(colon + 1).trim();
-    if (!customCssProperties.has(property) || !cssValue || cssValue.length > 300 || !safeCssValue.test(cssValue)) {
+    const validInteger = property !== 'z-index' || /^-?\d+$/.test(cssValue);
+    if (!customCssProperties.has(property) || !cssValue || cssValue.length > 300 || !safeCssValue.test(cssValue) || !validInteger) {
       rejected.push(declaration);
       return;
     }

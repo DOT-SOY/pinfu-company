@@ -10,6 +10,10 @@ import { renderBoard } from './js/pages/board.js';
 import { bindDetail, renderDetail, resetDetailState } from './js/pages/detail.js';
 import { bindAccount, bindAuth, renderAccount, renderAuth } from './js/pages/auth-account.js';
 import { bindAdmin, renderAdmin } from './js/pages/admin.js';
+import { bindCharactersAdmin, confirmLeaveCharactersAdmin, renderCharactersAdmin } from './js/pages/characters-admin.js';
+import { bindSkillsAdmin, confirmLeaveSkillsAdmin, renderSkillsAdmin } from './js/pages/skills-admin.js';
+import { bindActionsAdmin, confirmLeaveActionsAdmin, renderActionsAdmin } from './js/pages/actions-admin.js';
+import { bindStatsAdmin, confirmLeaveStatsAdmin, renderStatsAdmin } from './js/pages/stats-admin.js';
 import { getActiveOrgTemplate, getMyOrgProfile, getOrgProfile, getOrgProfileDetail, loadPublicOrganization } from './js/organization.js';
 import { bindOrganizationViewer, renderOrganization } from './js/pages/organization.js';
 import { renderOrganizationDetail } from './js/pages/organization-detail.js';
@@ -75,6 +79,18 @@ async function render() {
     } else if (parts[0] === 'account') {
       html = renderAccount();
       title = '마이페이지 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'stats') {
+      html = renderStatsAdmin();
+      title = '스탯 정의 관리 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'actions') {
+      html = renderActionsAdmin();
+      title = '행동 관리 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'skills') {
+      html = renderSkillsAdmin();
+      title = '스킬 관리 | 핑후컴퍼니';
+    } else if (parts[0] === 'admin' && parts[1] === 'characters') {
+      html = renderCharactersAdmin();
+      title = '캐릭터 관리 | 핑후컴퍼니';
     } else if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'templates') {
       pageData = getAuthState().isAdmin ? await loadOrganizationTemplatesData() : { outer: [], inner: [] };
       html = renderOrganizationTemplateEditor(pageData, params);
@@ -129,7 +145,11 @@ async function render() {
     if (parts[0] === 'account') bindAccount({ navigate, onProfileChanged: updateAuthUI });
     if (parts[0] === 'company' && parts[1] === 'organization' && !parts[2]) bindOrganizationViewer();
     if (parts[0] === 'account' && parts[1] === 'organization') bindOrganizationProfileEditor({ ...pageData, navigate });
-    if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'templates') bindOrganizationTemplateEditor({ data: pageData, params, refresh: render, navigate });
+    if (parts[0] === 'admin' && parts[1] === 'stats') bindStatsAdmin(params);
+    else if (parts[0] === 'admin' && parts[1] === 'actions') bindActionsAdmin(params);
+    else if (parts[0] === 'admin' && parts[1] === 'skills') bindSkillsAdmin(params);
+    else if (parts[0] === 'admin' && parts[1] === 'characters') bindCharactersAdmin(params);
+    else if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'templates') bindOrganizationTemplateEditor({ data: pageData, params, refresh: render, navigate });
     else if (parts[0] === 'admin' && parts[1] === 'organization' && parts[2] === 'users') bindOrganizationUsersAdmin({ users: pageData, refresh: render });
     else if (parts[0] === 'admin' && parts[1] === 'organization') bindOrganizationAdmin({ data: pageData, params, navigate, refresh: render });
     else if (parts[0] === 'admin') bindAdmin(parts[1] === 'edit' ? 'edit' : 'new', adminPost, navigate);
@@ -146,12 +166,13 @@ function updateAuthUI() {
   const utility = document.getElementById('auth-utility');
   const mobileAuth = document.getElementById('mobile-auth-links');
   const links = auth.loggedIn
-    ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>${auth.canManageOrgProfile ? '<a href="#/account/organization">조직도 프로필</a>' : ''}${auth.isAdmin ? '<a href="#/admin/new">게시글 관리</a><a href="#/admin/organization">조직도 관리</a>' : ''}<button type="button" data-global-logout>로그아웃</button>`
+    ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>${auth.canManageOrgProfile ? '<a href="#/account/organization">조직도 프로필</a>' : ''}${auth.isAdmin ? '<a href="#/admin/new">게시글 관리</a><a href="#/admin/organization">조직도 관리</a><a href="#/admin/characters">캐릭터 관리</a><a href="#/admin/skills">스킬 관리</a><a href="#/admin/actions">행동 관리</a><a href="#/admin/stats">스탯 정의 관리</a>' : ''}<button type="button" data-global-logout>로그아웃</button>`
     : '<a href="#/login">로그인</a><a href="#/signup">회원가입</a>';
   desktop.innerHTML = links;
   utility.innerHTML = auth.loggedIn ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>` : '<a href="#/login">로그인</a> · <a href="#/signup">회원가입</a>';
   mobileAuth.innerHTML = links;
   document.querySelectorAll('[data-global-logout]').forEach((button) => button.addEventListener('click', async () => {
+    if (!confirmLeaveCharactersAdmin(false) || !confirmLeaveSkillsAdmin(false) || !confirmLeaveActionsAdmin(false) || !confirmLeaveStatsAdmin(false)) return;
     try { await signOut(); navigate('/'); }
     catch (error) { alert(errorMessage(error, '로그아웃에 실패했습니다.')); }
   }));
@@ -192,19 +213,27 @@ closeMobileMenu();
 
 let lastHash = location.hash || '#/';
 let restoringHash = false;
-window.addEventListener('hashchange', () => {
+window.addEventListener('hashchange', (event) => {
   closeMobileMenu();
-  if (restoringHash) { restoringHash = false; return; }
-  if (!confirmLeaveOrganizationEditor() || !confirmLeaveOrganizationTemplateEditor()) {
+  if (restoringHash) { restoringHash = false; lastHash = location.hash || '#/'; return; }
+  if (!confirmLeaveCharactersAdmin() || !confirmLeaveSkillsAdmin() || !confirmLeaveActionsAdmin() || !confirmLeaveStatsAdmin() || !confirmLeaveOrganizationEditor() || !confirmLeaveOrganizationTemplateEditor()) {
     restoringHash = true;
-    location.hash = lastHash;
+    location.hash = new URL(event.oldURL).hash || lastHash;
     return;
   }
   lastHash = location.hash;
   resetDetailState();
   render();
 });
-onAuthChange(updateAuthUI);
+let characterAuthIdentity = null;
+onAuthChange(() => {
+  updateAuthUI();
+  // Do not retain another session's character details after logout/role changes.
+  const auth = getAuthState();
+  const identity = String(auth.user?.id || '') + ':' + auth.isAdmin;
+  if (identity !== characterAuthIdentity && ['/admin/characters','/admin/skills','/admin/actions','/admin/stats'].includes(route())) render();
+  characterAuthIdentity = identity;
+});
 initDatabase().catch((error) => {
   console.error('Supabase SDK 초기화 실패:', error);
 }).then(initAuth).then(() => { updateAuthUI(); render(); }).catch((error) => {
