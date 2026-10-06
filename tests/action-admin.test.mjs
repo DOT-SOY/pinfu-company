@@ -40,7 +40,7 @@ test('isolated PostgreSQL action creation/editing and actual Python execution',a
   const {PGlite}=await import(pathToFileURL(process.env.PGLITE_MODULE).href);const db=new PGlite();
   try{
     await db.exec(await readFile(new URL('./fixtures/character-schema.sql',import.meta.url),'utf8'));
-    for(const file of ['character-admin.sql','skill-admin.sql','skill-command-admin.sql','action-admin.sql'])await db.exec(await readFile(new URL('../sql/'+file,import.meta.url),'utf8'));
+    for(const file of ['character-admin.sql','action-admin.sql'])await db.exec(await readFile(new URL('../sql/'+file,import.meta.url),'utf8'));
     const setUser=id=>db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);
     const admin='11111111-1111-1111-1111-111111111111',normal='22222222-2222-2222-2222-222222222222';
     await setUser(admin);await db.exec('set role authenticated');
@@ -64,11 +64,10 @@ test('isolated PostgreSQL action creation/editing and actual Python execution',a
       const output=spawnSync(process.env.CORE_BOT_PYTHON,['-X','utf8','-c',source],{input:JSON.stringify({data,mode}),encoding:'utf8'});
       assert.equal(output.status,0,output.stderr);return JSON.parse(output.stdout);
     };
-    await t.test('creates action + rule + stat effect atomically and exposes it as a skill target',async()=>{
+    await t.test('creates action + rule + stat effect atomically',async()=>{
       created=await save(null,null,draft());assert.match(created.command.id,/^\d+$/);assert.match(created.rules[0].id,/^\d+$/);assert.match(created.rules[0].stats[0].id,/^\d+$/);
       assert.equal(created.rules[0].condition_delta,-5);assert.equal(created.rules[0].stats[0].delta,2);
       const list=await call("select public.admin_list_actions('정돈',true,0) as result");assert.equal(list.total,1);
-      const skills=await call('select public.admin_skill_editor(null) as result');assert.ok(skills.commands.some(c=>c.id===created.command.id));
       await assert.rejects(save(null,null,draft()),/COMMAND_ALREADY_EXISTS/);
     });
     await t.test('real Python engine uses base condition/stat changes and applies the targeted skill',t=>{

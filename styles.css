@@ -8,12 +8,7 @@
   --paper: #f5f8fa;
 }
 
-/* Shared skill editor extends the same existing admin surface. */
 .admin-page-links { display:flex; gap:14px; flex-wrap:wrap; }
-.stat-admin textarea { width:100%; border:1px solid #becdd8; border-radius:6px; padding:10px 12px; resize:vertical; }
-.stat-admin input[readonly] { background:var(--paper); color:var(--muted); }
-.stat-list-description { display:block; margin:8px 0; font-size:12px; font-weight:400; white-space:pre-wrap; overflow-wrap:anywhere; }
-.stat-admin .character-review strong { max-width:70%; white-space:pre-wrap; }
 .action-admin textarea { width:100%; border:1px solid #becdd8; border-radius:6px; padding:10px 12px; resize:vertical; color:var(--ink); font-weight:400; }
 .action-admin textarea:focus { outline:3px solid #93d4f3; outline-offset:2px; }
 .action-admin input[readonly] { background:var(--paper); color:var(--muted); }
@@ -28,23 +23,9 @@
 .character-admin [hidden] { display:none !important; }
 .action-admin .character-review strong { max-width:72%; white-space:pre-wrap; }
 .action-admin .character-review li { align-items:flex-start; }
-.skill-admin textarea { width:100%; border:1px solid #becdd8; border-radius:6px; padding:10px 12px; resize:vertical; color:var(--ink); font-weight:400; }
-.skill-admin textarea:focus { outline:3px solid #93d4f3; outline-offset:2px; }
 .skill-new { width:100%; margin-bottom:20px; }
 .skill-key { display:block; color:var(--muted); font-size:10px; font-weight:400; margin-top:6px; overflow-wrap:anywhere; }
 .skill-warning { padding:14px 16px; border-left:3px solid #cc954b; background:#fff8ec; color:#73592e; font-size:12px; line-height:1.8; }
-.skill-admin .skill-modifier { border:1px solid var(--line); padding:18px; border-radius:8px; }
-.skill-admin .skill-modifier legend { float:none; width:auto; padding:0 8px; border:0; font-size:14px; margin:0; }
-.skill-admin .character-review li { align-items:flex-start; }
-.skill-admin .character-review strong { max-width:72%; white-space:pre-wrap; }
-.skill-admin input[readonly] { background:var(--paper); color:var(--muted); }
-.skill-command-tools { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.skill-admin .skill-command-tools button { padding:6px 9px; font-size:11px; }
-.skill-command-dialog { width:min(700px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; padding:24px; border:1px solid var(--line); border-radius:12px; color:var(--ink); }
-.skill-command-dialog::backdrop { background:rgba(5,25,42,.5); }
-.skill-command-dialog h2 { margin-top:0; font-size:23px; }
-.skill-command-dialog .skill-command-description { margin-top:18px; }
-.skill-command-dialog .skill-warning { margin-bottom:0; }
 .character-admin #character-grant a { color:var(--blue); text-decoration:underline; }
 
 /* Character admin extends the existing navy/sky working surfaces. */

@@ -1,5 +1,5 @@
 import { characterId, integerInput, characterError } from './character-admin-model.js';
-import { commandDefinition, commandError } from './skill-command-model.js';
+import { commandDefinition, commandError } from './command-model.js';
 export const RULE_TYPES={effect:'일반 효과',repeat_penalty:'반복 패널티',requirement:'행동 필수 조건'};
 export const RULE_FIELDS=['rule_key','description','enabled','priority','rule_type','use_from','use_to','previous_command_id','condition_min','condition_max','dice_outcome','condition_delta'];
 export function newActionRule(rules=[]) {

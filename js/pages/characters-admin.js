@@ -73,7 +73,7 @@ export function renderCharacterDetail(data) {
     </form>
     <section class="character-skills"><header><div><h2>보유 스킬</h2><p>사용 제한은 스킬 전체가 아닌 개별 효과별로 계산됩니다.</p></div><button type="button" id="character-open-grant">＋ 스킬 부여</button></header>
       <div class="character-skill-list">${data.skills.map(skillCard).join('') || '<p class="character-empty">보유한 스킬이 없습니다.</p>'}</div>
-      <div id="character-grant" hidden><p class="character-note">찾는 스킬이 없나요? <a href="#/admin/skills?new=1">새 스킬 만들기 →</a></p><form id="character-skill-search"><label>기존 스킬 검색<input type="search" name="search" maxlength="200" placeholder="활성화된 스킬 이름"></label><button type="submit">검색</button></form><div id="character-skill-results"></div></div>
+      <div id="character-grant" hidden><form id="character-skill-search"><label>기존 스킬 검색<input type="search" name="search" maxlength="200" placeholder="활성화된 스킬 이름"></label><button type="submit">검색</button></form><div id="character-skill-results"></div></div>
       <div id="character-skill-message" role="status"></div>
     </section>`;
 }
