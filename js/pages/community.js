@@ -1,6 +1,8 @@
 import { getAuthState } from '../auth.js';
 import { esc, errorMessage } from '../ui.js';
 import { listCommunityPosts, getCommunityPost, saveCommunityPost, deleteCommunityPost, listCommunityComments, saveCommunityComment, deleteCommunityComment, getStockProfile, saveStockProfile, incrementCommunityView } from '../community.js';
+import { renderMarkdown } from '../markdown.js';
+import { setCommunityPostAction } from '../community.js';
 import { loginRequired } from './runner.js';
 
 const label = board => board === 'stock' ? '종목토론방' : '익명게시판';
@@ -8,7 +10,7 @@ const name = (board,row) => board === 'stock' ? esc(row.nickname || '알 수 없
 const date = value => esc(new Date(value).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}));
 const meta = (board,row) => `${name(board,row)} · ${date(row.created_at)}${row.edited_at ? ' · 수정됨' : ''}`;
 function shell(board,body,write=true) {
-  return `<section class="community-shell ${board === 'stock' ? 'community-blue' : 'community-red'}"><div class="runner-top"><a href="#/runner">러너 전용</a><a href="#/">홈으로</a></div><div class="community-nav"><nav aria-label="커뮤니티"><a class="${board==='anonymous'?'active':''}" href="#/community/anonymous">익명게시판</a><a class="${board==='stock'?'active':''}" href="#/community/stock">종목토론방</a></nav>${write?`<a class="community-cta" href="#/community/${board}/write">글쓰기</a>`:''}</div>${body}</section>`;
+  return `<section class="community-shell ${board === 'stock' ? 'community-blue' : 'community-red'}"><div class="runner-top"><a href="#/runner">러너 전용</a><a href="#/">홈으로</a></div><div class="community-nav"><nav aria-label="커뮤니티"><a class="${board==='anonymous'?'active':''}" href="#/community/anonymous">익명게시판</a><a class="${board==='stock'?'active':''}" href="#/community/stock">종목토론방</a></nav>${write?`<a class="community-cta" href="#/community/${board}/write">글쓰기</a>`:''}</div>${body}<p id="reaction-status" class="community-error" role="status"></p></section>`;
 }
 export async function loadCommunity(parts) {
   if (!getAuthState().loggedIn) return {html:loginRequired()};
@@ -19,7 +21,7 @@ export async function loadCommunity(parts) {
     return {html:shell(board,profileForm(profile),false),kind:'profile',board,profile};
   }
   if(parts[2]==='write' && parts.length===3) return {html:shell(board,postForm(board,profile),false),kind:'write',board,profile};
-  if(parts[2]) {
+  if(parts[2] && parts[2]!=='saved') {
     const id=Number(parts[2]);
     if(!Number.isSafeInteger(id) || id<1 || parts.length>4 || (parts[3] && parts[3]!=='edit')) throw new Error('INVALID_COMMUNITY_ROUTE');
     const post=await getCommunityPost(board,id);
@@ -31,14 +33,19 @@ export async function loadCommunity(parts) {
     const comments=await listCommunityComments(board,id);
     return {html:shell(board,detail(board,post,comments),false),kind:'detail',board,post,comments};
   }
-  const feed=await listCommunityPosts(board);
-  return {html:shell(board,`${board==='stock'?'<div class="community-heading"><h1>핑후컴퍼니</h1><p>종목토론방</p><a href="#/community/stock/profile">프로필 설정</a></div>':'<h1 class="community-heading">익명게시판</h1>'}<div id="community-feed">${rowsHtml(board,feed.rows)}</div><p id="feed-status" role="status"></p><div id="feed-pagination" class="community-pagination"></div><div id="feed-sentinel" class="community-sentinel"></div><button id="feed-more" class="community-mobile-more" type="button">더 불러오기</button>`),kind:'feed',board,feed};
+  const savedOnly=parts[2]==='saved';
+  if(savedOnly&&parts.length!==3) throw new Error('INVALID_COMMUNITY_ROUTE');
+  const feed=await listCommunityPosts(board,0,savedOnly);
+  return {html:shell(board,`${board==='stock'?'<div class="community-heading"><h1>핑후컴퍼니</h1><p>종목토론방</p><a href="#/community/stock/profile">프로필 설정</a></div>':'<h1 class="community-heading">익명게시판</h1>'}<nav class="community-filter" aria-label="글 목록"><a href="#/community/${board}" class="${savedOnly?'':'active'}">전체 글</a><a href="#/community/${board}/saved" class="${savedOnly?'active':''}">저장한 글</a></nav><div id="community-feed">${rowsHtml(board,feed.rows)}</div><p id="feed-status" role="status"></p><div id="feed-pagination" class="community-pagination"></div><div id="feed-sentinel" class="community-sentinel"></div><button id="feed-more" class="community-mobile-more" type="button">더 불러오기</button>`),kind:'feed',board,feed,savedOnly};
 }
 function rowsHtml(board,rows) {
-  return rows.map(row=>`<a class="community-row" href="#/community/${board}/${row.id}">${board==='stock'?`<div class="community-meta">${meta(board,row)}</div>`:''}<h2>${esc(row.title)}</h2><p class="community-preview">${esc(row.content)}</p><div class="community-meta">${board==='anonymous'?`${meta(board,row)} · `:''}조회 ${row.view_count} · 댓글 ${row.comment_count}</div></a>`).join('') || '<p class="community-empty">등록된 글이 없습니다.</p>';
+  return rows.map(row=>`<article class="community-row"><a class="community-row-link" href="#/community/${board}/${row.id}">${board==='stock'?`<div class="community-meta">${meta(board,row)}</div>`:''}<h2>${esc(row.title)}</h2><p class="community-preview">${esc(row.content)}</p><div class="community-meta">${board==='anonymous'?`${meta(board,row)} · `:''}조회 ${row.view_count} · 댓글 ${row.comment_count}</div></a>${reactionsHtml(row)}</article>`).join('') || '<p class="community-empty">등록된 글이 없습니다.</p>';
+}
+function reactionsHtml(row) {
+  return `<div class="community-reactions"><button type="button" data-reaction="like" data-post-id="${row.id}" aria-pressed="${!!row.liked}">좋아요 <span>${row.like_count || 0}</span></button><button type="button" data-reaction="bookmark" data-post-id="${row.id}" aria-pressed="${!!row.saved}">${row.saved?'저장됨':'저장'}</button></div>`;
 }
 function postForm(board,profile,post=null) {
-  return `<a class="community-back" href="#/community/${board}${post?`/${post.id}`:''}">← ${label(board)}</a><h1>${post?'글 수정':'글쓰기'}</h1><p class="community-meta">${board==='anonymous'?'익명으로 등록됩니다.':`${esc(profile.nickname)} 이름으로 등록됩니다.`}</p><form id="community-post-form" class="community-form"><label>제목<input name="title" maxlength="200" required value="${esc(post?.title || '')}"></label><label>내용<textarea name="content" maxlength="20000" rows="12" required>${esc(post?.content || '')}</textarea></label><p class="community-error" role="status"></p><div class="community-actions"><a href="#/community/${board}${post?`/${post.id}`:''}">취소</a><button class="community-cta" type="submit">${post?'저장하기':'등록하기'}</button></div></form>`;
+  return `<a class="community-back" href="#/community/${board}${post?`/${post.id}`:''}">← ${label(board)}</a><h1>${post?'글 수정':'글쓰기'}</h1><p class="community-meta">${board==='anonymous'?'익명으로 등록됩니다.':`${esc(profile.nickname)} 이름으로 등록됩니다.`}</p><form id="community-post-form" class="community-form"><label>제목<input name="title" maxlength="200" required value="${esc(post?.title || '')}"></label><label>내용 <span>Markdown 사용 가능: **굵게**, # 제목, 목록, 링크, 코드</span><textarea name="content" maxlength="20000" rows="12" required>${esc(post?.content || '')}</textarea></label><p class="community-error" role="status"></p><div class="community-actions"><a href="#/community/${board}${post?`/${post.id}`:''}">취소</a><button class="community-cta" type="submit">${post?'저장하기':'등록하기'}</button></div></form>`;
 }
 function profileForm(profile) {
   return `<h1>프로필 ${profile?'설정':'만들기'}</h1><form id="stock-profile-form" class="community-form"><label>닉네임 *<input name="nickname" maxlength="20" required value="${esc(profile?.nickname || '')}"></label><label>한 줄 소개 (선택)<textarea name="bio" maxlength="100" rows="3">${esc(profile?.bio || '')}</textarea></label><p class="community-meta">종목토론방에서 사용할 프로필입니다. 익명게시판에는 표시되지 않습니다.</p><p class="community-error" role="status"></p><div class="community-actions"><a href="#/runner">취소</a><button class="community-cta" type="submit">저장하기</button></div></form>`;
@@ -49,10 +56,10 @@ function controls(row,field,comment=false) {
   return `<div class="community-actions">${own?`<button type="button" data-action="${comment?'comment-edit':'post-edit'}" data-id="${row.id}">수정</button>`:''}<button type="button" data-action="${comment?'comment-delete':'post-delete'}" data-id="${row.id}">삭제</button></div>`;
 }
 function commentsHtml(board,rows) {
-  return rows.map(row=>`<article class="community-comment" data-comment="${row.id}"><div class="community-meta">${meta(board,row)}</div><p class="community-content">${esc(row.content)}</p>${controls(row,'user_id',true)}</article>`).join('');
+  return rows.map(row=>`<article class="community-comment" data-comment="${row.id}"><div class="community-meta">${meta(board,row)}</div><div class="community-content markdown-body">${renderMarkdown(row.content)}</div>${controls(row,'user_id',true)}</article>`).join('');
 }
 function detail(board,post,comments) {
-  return `<a class="community-back" href="#/community/${board}">← ${label(board)}</a><article><h1>${esc(post.title)}</h1><div class="community-meta">${meta(board,post)}</div>${controls(post,'author_id')}<p class="community-content community-post-content">${esc(post.content)}</p><p class="community-meta">조회 <span id="community-view-count">${post.view_count}</span> · 댓글 <span id="community-comment-count">${post.comment_count}</span></p></article><section class="community-comments"><h2>댓글</h2><div id="community-comments-list">${commentsHtml(board,comments.rows)}</div><button id="comments-more" type="button" ${comments.hasMore?'':'hidden'}>댓글 더보기</button><p id="comments-status" class="community-error" role="status"></p><form id="community-comment-form" class="community-form"><label>댓글<textarea name="content" maxlength="2000" rows="3" required></textarea></label><div class="community-actions"><button class="community-cta" type="submit">등록하기</button></div></form></section>`;
+  return `<a class="community-back" href="#/community/${board}">← ${label(board)}</a><article><h1>${esc(post.title)}</h1><div class="community-meta">${meta(board,post)}</div>${controls(post,'author_id')}<div class="community-content community-post-content markdown-body">${renderMarkdown(post.content)}</div>${reactionsHtml(post)}<p class="community-meta">조회 <span id="community-view-count">${post.view_count}</span> · 댓글 <span id="community-comment-count">${post.comment_count}</span></p></article><section class="community-comments"><h2>댓글</h2><div id="community-comments-list">${commentsHtml(board,comments.rows)}</div><button id="comments-more" type="button" ${comments.hasMore?'':'hidden'}>댓글 더보기</button><p id="comments-status" class="community-error" role="status"></p><form id="community-comment-form" class="community-form"><label>댓글<textarea name="content" maxlength="2000" rows="3" required></textarea></label><div class="community-actions"><button class="community-cta" type="submit">등록하기</button></div></form></section>`;
 }
 export function bindCommunity(data,{navigate,refresh,isCurrent}) {
   const cleanups=[], active=()=>isCurrent()&&getAuthState().loggedIn;
@@ -67,6 +74,26 @@ export function bindCommunity(data,{navigate,refresh,isCurrent}) {
       try {await save(values);} catch(error) {fail(box,error);} finally {button.disabled=false;}
     };
   };
+  const reactionRoot=document.querySelector('.community-shell');
+  const react=async event=>{
+    const button=event.target.closest('[data-reaction]');
+    if(!button||button.disabled||!active()) return;
+    const id=Number(button.dataset.postId),action=button.dataset.reaction,wanted=button.getAttribute('aria-pressed')!=='true';
+    const related=[...reactionRoot.querySelectorAll('[data-reaction]')].filter(node=>Number(node.dataset.postId)===id);
+    related.forEach(node=>node.disabled=true);
+    const box=document.getElementById('reaction-status');box.textContent='';
+    try {
+      const result=await setCommunityPostAction(id,action,wanted);
+      if(!active()) return;
+      related.forEach(node=>{
+        if(node.dataset.reaction==='like') node.querySelector('span').textContent=result.like_count;
+        if(node.dataset.reaction===action){node.setAttribute('aria-pressed',String(result.active));if(action==='bookmark')node.textContent=result.active?'저장됨':'저장';}
+      });
+      if(data.savedOnly&&action==='bookmark'&&!result.active) refresh();
+    } catch(error){fail(box,error);} finally {related.forEach(node=>node.disabled=false);}
+  };
+  reactionRoot?.addEventListener('click',react);
+  cleanups.push(()=>reactionRoot?.removeEventListener('click',react));
   if(data.kind==='profile') bindForm('stock-profile-form',async values=>{await saveStockProfile(values,!!data.profile);if(active()){if(location.hash.split('?')[0]==='#/community/stock') refresh();else navigate('/community/stock');}});
   if(data.kind==='write') bindForm('community-post-form',async values=>{const post=await saveCommunityPost(data.board,values,data.post?.id);if(active()) navigate(`/community/${data.board}/${post.id}`);});
   if(data.kind==='feed') {
@@ -82,7 +109,7 @@ export function bindCommunity(data,{navigate,refresh,isCurrent}) {
       if(loading||!active()||(append&&!hasMore)) return;
       const token=version; loading=true;failed=false;status.textContent='불러오는 중…';showControls();
       try {
-        const result=await listCommunityPosts(data.board,next);
+        const result=await listCommunityPosts(data.board,next,data.savedOnly);
         if(!active()||token!==version) return;
         if(append) {
           const existing=new Set([...feed.querySelectorAll('a')].map(a=>a.getAttribute('href')));

@@ -14,16 +14,25 @@ async function withNames(rows, board, field) {
   const names=new Map(profiles.map(profile=>[profile.user_id,profile.nickname]));
   return rows.map(row=>({...row,nickname:names.get(row[field]) || '알 수 없는 사용자'}));
 }
-export async function listCommunityPosts(board,page=0) {
-  userId();
-  const rows=await result(requireDatabase().from('community_posts').select(POST_COLUMNS).eq('board_type',board).order('created_at',{ascending:false}).order('id',{ascending:false}).range(page*PAGE_SIZE,page*PAGE_SIZE+PAGE_SIZE));
-  return {rows:await withNames(rows.slice(0,PAGE_SIZE),board,'author_id'),hasMore:rows.length>PAGE_SIZE};
+async function withActions(rows) {
+  if(!rows.length) return rows;
+  const actions=await result(requireDatabase().from('community_post_actions').select('post_id,action').eq('user_id',userId()).in('post_id',rows.map(row=>row.id)));
+  const keys=new Set(actions.map(row=>`${row.post_id}:${row.action}`));
+  return rows.map(row=>({...row,liked:keys.has(`${row.id}:like`),saved:keys.has(`${row.id}:bookmark`)}));
+}
+export async function listCommunityPosts(board,page=0,savedOnly=false) {
+  const uid=userId();
+  let query=requireDatabase().from('community_posts').select(`${POST_COLUMNS},like_count${savedOnly?',saved_actions:community_post_actions!inner(action,user_id)':''}`).eq('board_type',board);
+  if(savedOnly) query=query.eq('saved_actions.action','bookmark').eq('saved_actions.user_id',uid);
+  const rows=await result(query.order('created_at',{ascending:false}).order('id',{ascending:false}).range(page*PAGE_SIZE,page*PAGE_SIZE+PAGE_SIZE));
+  return {rows:await withActions(await withNames(rows.slice(0,PAGE_SIZE),board,'author_id')),hasMore:rows.length>PAGE_SIZE};
 }
 export async function getCommunityPost(board,id) {
   userId();
-  const post=await result(requireDatabase().from('community_posts').select(POST_COLUMNS).eq('board_type',board).eq('id',id).maybeSingle());
-  return post ? (await withNames([post],board,'author_id'))[0] : null;
+  const post=await result(requireDatabase().from('community_posts').select(`${POST_COLUMNS},like_count`).eq('board_type',board).eq('id',id).maybeSingle());
+  return post ? (await withActions(await withNames([post],board,'author_id')))[0] : null;
 }
+export function setCommunityPostAction(id,action,active) { userId();return result(requireDatabase().rpc('set_community_post_action',{p_post_id:id,p_action:action,p_active:active})); }
 export async function saveCommunityPost(board,values,id=null) {
   const client=requireDatabase(), author_id=userId();
   const payload={title:values.title.trim(),content:values.content.trim()};

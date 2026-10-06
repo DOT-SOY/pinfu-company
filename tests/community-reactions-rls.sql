@@ -1,0 +1,40 @@
+-- Real roles and triggers; all fixtures roll back.
+begin;
+do $$
+declare owner_id uuid; other_id uuid; target bigint; n integer; stamp timestamptz;
+begin
+  select id into owner_id from public.profiles order by id limit 1;
+  select id into other_id from public.profiles where id<>owner_id order by id limit 1;
+  if other_id is null then raise exception 'Two identities required'; end if;
+  perform set_config('request.jwt.claim.sub',owner_id::text,true);
+  execute 'set local role authenticated';
+  insert into public.community_posts(board_type,author_id,title,content) values('anonymous',owner_id,'reaction QA','**Markdown**') returning id into target;
+  perform public.set_community_post_action(target,'like',true);
+  perform public.set_community_post_action(target,'like',true);
+  perform public.set_community_post_action(target,'bookmark',true);
+  if (select like_count from public.community_posts where id=target)<>1 then raise exception 'Idempotence/count'; end if;
+  if (select edited_at from public.community_posts where id=target) is not null then raise exception 'Counter edited timestamp'; end if;
+  begin update public.community_posts set like_count=99 where id=target; raise exception 'Counter forgery'; exception when insufficient_privilege then null; end;
+  perform set_config('request.jwt.claim.sub',other_id::text,true);
+  if exists(select 1 from public.community_post_actions where post_id=target) then raise exception 'Other actions visible'; end if;
+  delete from public.community_post_actions where post_id=target;
+  get diagnostics n=row_count; if n<>0 then raise exception 'Other actions deleted'; end if;
+  begin insert into public.community_post_actions(post_id,user_id,action) values(target,owner_id,'bookmark'); raise exception 'Owner forgery'; exception when insufficient_privilege then null; end;
+  perform public.set_community_post_action(target,'like',true);
+  if (select like_count from public.community_posts where id=target)<>2 then raise exception 'Two-user count'; end if;
+  perform set_config('request.jwt.claim.sub',owner_id::text,true);
+  if (select count(*) from public.community_posts p join public.community_post_actions a on a.post_id=p.id where p.id=target and a.action='bookmark')<>1 then raise exception 'Saved join'; end if;
+  perform public.set_community_post_action(target,'like',false);
+  perform public.set_community_post_action(target,'like',false);
+  if (select like_count from public.community_posts where id=target)<>1 then raise exception 'Unlike idempotence'; end if;
+  perform public.set_community_post_action(target,'bookmark',false);
+  if exists(select 1 from public.community_post_actions where post_id=target) then raise exception 'Unsaved'; end if;
+  delete from public.community_posts where id=target;
+  execute 'reset role';
+  if exists(select 1 from public.community_post_actions where post_id=target) then raise exception 'Cascade'; end if;
+  execute 'set local role anon';
+  begin perform public.set_community_post_action(target,'like',true); raise exception 'Anon RPC allowed'; exception when insufficient_privilege then null; end;
+  begin perform 1 from public.community_post_actions; raise exception 'Anon read allowed'; exception when insufficient_privilege then null; end;
+  execute 'reset role';
+end $$;
+rollback;

@@ -72,3 +72,13 @@ body.runner-mode { background:#fff; color:#202733; }
   .runner-shortcuts { gap:16px; }
   .runner-shortcuts a { font-size:15px; }
 }
+
+.community-row-link { display:block; }
+.community-reactions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.community-reactions button { font-size:13px; padding:8px 12px; }
+.community-reactions button[aria-pressed="true"] { color:var(--accent); border-color:var(--accent); }
+.community-filter { display:flex; gap:24px; border-bottom:1px solid #e6e8ec; }
+.community-filter a { padding:14px 0; font-size:14px; border-bottom:2px solid transparent; }
+.community-filter a.active { color:var(--accent); border-color:var(--accent); }
+.community-content.markdown-body { white-space:normal; }
+.community-content pre { max-width:100%; overflow:auto; }

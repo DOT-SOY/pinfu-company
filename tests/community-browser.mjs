@@ -20,7 +20,7 @@ const url=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true,channel:process.env.QA_BROWSER_CHANNEL || 'chrome'});
 const uid='11111111-1111-4111-8111-111111111111', other='22222222-2222-4222-8222-222222222222';
 const seed=()=>Array.from({length:45},(_,i)=>({id:45-i,board_type:'anonymous',author_id:i===0?uid:other,title:`테스트 제목 ${45-i}`,content:'본문 미리보기 <script>unsafe</script>\n둘째 줄',created_at:new Date(Date.UTC(2026,9,6,0,0,45-i)).toISOString(),edited_at:null,view_count:0,comment_count:0}));
-let posts=seed(),comments=[],stock=null,log=[],admin=false,nextId=100;
+let actions=[],posts=seed(),comments=[],stock=null,log=[],admin=false,nextId=100;
 const context=await browser.newContext({viewport:{width:1280,height:900}});
 await context.route('**/cdn.jsdelivr.net/npm/@supabase/supabase-js@2',route=>route.fulfill({contentType:'text/javascript',body:sdk}));
 await context.route('https://evzrzwbemqrwlaqeowkq.supabase.co/**',async route=>{
@@ -37,7 +37,15 @@ await context.route('https://evzrzwbemqrwlaqeowkq.supabase.co/**',async route=>{
     const board=(u.searchParams.get('board_type')||'eq.anonymous').slice(3);
     if(method==='POST') {const row={...body,id:nextId++,created_at:new Date().toISOString(),edited_at:null,view_count:0,comment_count:0};posts.unshift(row);rows=[row];}
     else if(method==='PATCH'||method==='DELETE') {const id=Number(u.searchParams.get('id')?.slice(3));const row=posts.find(p=>p.id===id);if(row){if(method==='PATCH'){Object.assign(row,body,{edited_at:new Date().toISOString()});rows=[row];}else{posts=posts.filter(p=>p.id!==id);rows=[{id}];}}}
-    else {rows=posts.filter(p=>p.board_type===board);if(u.searchParams.has('id')) rows=rows.filter(p=>p.id===Number(u.searchParams.get('id').slice(3)));const offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||rows.length);rows=rows.slice(offset,offset+limit);}
+    else {rows=posts.filter(p=>p.board_type===board);if(u.searchParams.has('saved_actions.action'))rows=rows.filter(p=>actions.some(a=>a.post_id===p.id&&a.action==='bookmark'));if(u.searchParams.has('id')) rows=rows.filter(p=>p.id===Number(u.searchParams.get('id').slice(3)));const offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||rows.length);rows=rows.slice(offset,offset+limit);}
+  }
+  if(table==='community_post_actions') {const ids=(u.searchParams.get('post_id')||'').match(/\d+/g)||[];rows=actions.filter(a=>ids.includes(String(a.post_id)));}
+  if(table==='set_community_post_action') {
+    const row=posts.find(p=>p.id===body.p_post_id),found=actions.some(a=>a.post_id===row.id&&a.action===body.p_action);
+    if(body.p_active&&!found)actions.push({post_id:row.id,action:body.p_action});
+    if(!body.p_active)actions=actions.filter(a=>!(a.post_id===row.id&&a.action===body.p_action));
+    row.like_count=actions.filter(a=>a.post_id===row.id&&a.action==='like').length;
+    return route.fulfill({contentType:'application/json',body:JSON.stringify({active:body.p_active,like_count:row.like_count})});
   }
   if(table==='community_comments') {
     const id=Number(u.searchParams.get('id')?.slice(3)),postId=Number(u.searchParams.get('post_id')?.slice(3));
@@ -74,17 +82,28 @@ try {
   await page.screenshot({path:resolve(out,'anonymous-desktop.png'),fullPage:true});
   await page.locator('#feed-pagination button').last().click();await page.waitForFunction(()=>document.querySelector('#feed-pagination').innerText.includes('2 페이지'));assert.equal(await page.locator('.community-row').count(),20);
   await page.locator('#feed-pagination button').first().click();await page.waitForFunction(()=>document.querySelector('#feed-pagination').innerText.includes('1 페이지'));
-  await page.locator('.community-row').first().click();await visible('#community-comment-form');await page.waitForFunction(()=>document.querySelector('#community-view-count').textContent==='1');
+  await page.locator('.community-row-link').first().click();await visible('#community-comment-form');await page.waitForFunction(()=>document.querySelector('#community-view-count').textContent==='1');
   const viewCalls=log.filter(x=>x.table==='increment_community_post_view').length;await page.reload();await visible('#community-comment-form');assert.equal(log.filter(x=>x.table==='increment_community_post_view').length,viewCalls);
-  await page.locator('#community-comment-form textarea').fill('내 댓글');await page.locator('#community-comment-form button').click();await visible('.community-comment');assert.equal(await page.locator('#community-comment-count').innerText(),'1');
+  await page.locator('#community-comment-form textarea').fill('**내 댓글**');await page.locator('#community-comment-form button').click();await visible('.community-comment');assert.equal(await page.locator('#community-comment-count').innerText(),'1');assert.equal(await page.locator('.community-comment strong').innerText(),'내 댓글');
   await page.locator('[data-action="comment-edit"]').click();await page.locator('.community-comment textarea').fill('수정 댓글');await page.locator('.community-comment [type=submit]').click();await page.waitForFunction(()=>document.querySelector('.community-comment')?.innerText.includes('수정 댓글'));
   await page.locator('[data-action="comment-delete"]').click();await page.waitForFunction(()=>document.querySelector('#community-comment-count').textContent==='0');
   await page.locator('[data-action="post-edit"]').click();await visible('#community-post-form');await page.locator('input[name=title]').fill('수정된 글');await page.locator('#community-post-form [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#app h1')?.textContent==='수정된 글');
   await page.locator('[data-action="post-delete"]').click();await visible('#community-feed');
-  await page.locator('.community-nav .community-cta').click();await visible('#community-post-form');await page.locator('input[name=title]').fill('새 익명 글');await page.locator('#community-post-form textarea').fill('새 본문');await page.locator('#community-post-form [type=submit]').click();await visible('#community-comment-form');
+  await page.locator('.community-nav .community-cta').click();await visible('#community-post-form');await page.locator('input[name=title]').fill('새 익명 글');await page.locator('#community-post-form textarea').fill('# 제목\n\n**굵게** [위험](javascript:alert(1))\n\n- 목록\n\n```js\nconst x = 1;\n```\n\n<script>unsafe</script>');await page.locator('#community-post-form [type=submit]').click();await visible('#community-comment-form');
+
+  assert.equal(await page.locator('.community-post-content h1').innerText(),'제목');assert.equal(await page.locator('.community-post-content strong').innerText(),'굵게');assert.equal(await page.locator('.community-post-content script').count(),0);assert(!await page.locator('.community-post-content a').getAttribute('href').then(h=>h.startsWith('javascript:')));
+  await page.locator('[data-reaction="like"]').click();await page.waitForFunction(()=>document.querySelector('[data-reaction="like"]').getAttribute('aria-pressed')==='true');assert.equal(await page.locator('[data-reaction="like"] span').innerText(),'1');
+  await page.locator('[data-reaction="bookmark"]').click();await page.waitForFunction(()=>document.querySelector('[data-reaction="bookmark"]').getAttribute('aria-pressed')==='true');
+  await page.reload();await visible('#community-comment-form');assert.equal(await page.locator('[data-reaction="bookmark"]').getAttribute('aria-pressed'),'true');
+  await page.screenshot({path:resolve(out,'markdown-reactions-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.locator('[data-reaction="like"]').click();await page.waitForFunction(()=>document.querySelector('[data-reaction="like"]').getAttribute('aria-pressed')==='false');assert.equal(await page.locator('[data-reaction="like"] span').innerText(),'0');
+  await page.screenshot({path:resolve(out,'markdown-reactions-mobile.png'),fullPage:true});await page.setViewportSize({width:1280,height:900});
+  await go('/community/anonymous/saved');await visible('#community-feed');assert.equal(await page.locator('.community-row').count(),1);await page.locator('[data-reaction="bookmark"]').click();await visible('.community-empty');assert.equal(await page.locator('.community-row').count(),0);
   await go('/community/stock');await visible('#stock-profile-form');await page.locator('input[name=nickname]').fill('중복');await page.locator('#stock-profile-form button').click();await page.waitForFunction(()=>document.querySelector('.community-error').textContent.includes('이미 사용'));
   await page.locator('input[name=nickname]').fill('종토전용닉네임');await page.locator('textarea[name=bio]').fill('한줄 소개');await page.locator('#stock-profile-form button').click();await visible('#community-feed');
-  await page.locator('.community-nav .community-cta').click();await visible('#community-post-form');assert.match(await page.locator('#app').innerText(),/종토전용닉네임/);await page.locator('input[name=title]').fill('핑후 이야기');await page.locator('#community-post-form textarea').fill('종목토론 본문');await page.locator('#community-post-form [type=submit]').click();await visible('#community-comment-form');assert.match(await page.locator('#app').innerText(),/종토전용닉네임/);
+  await page.locator('.community-nav .community-cta').click();await visible('#community-post-form');assert.match(await page.locator('#app').innerText(),/종토전용닉네임/);await page.locator('input[name=title]').fill('핑후 이야기');await page.locator('#community-post-form textarea').fill('**종목토론 본문**');await page.locator('#community-post-form [type=submit]').click();await visible('#community-comment-form');assert.match(await page.locator('#app').innerText(),/종토전용닉네임/);
+  assert.equal(await page.locator('.community-post-content strong').innerText(),'종목토론 본문');await page.locator('[data-reaction="like"]').click();await page.waitForFunction(()=>document.querySelector('[data-reaction="like"] span').textContent==='1');await page.locator('[data-reaction="bookmark"]').click();await page.waitForFunction(()=>document.querySelector('[data-reaction="bookmark"]').getAttribute('aria-pressed')==='true');
   await go('/community/stock/profile');await visible('#stock-profile-form');await page.locator('input[name=nickname]').fill('수정종토닉네임');await page.locator('#stock-profile-form button').click();await visible('#community-feed');assert.match(await page.locator('#community-feed').innerText(),/수정종토닉네임/);assert(!await page.locator('#community-feed').innerText().then(t=>t.includes('한줄 소개')));
   await page.screenshot({path:resolve(out,'stock-desktop.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});

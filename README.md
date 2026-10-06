@@ -100,4 +100,12 @@ Supabase Storage와 파일 업로드를 사용하지 않습니다. `input type="
 
 ## 배포 설정
 
+### 커뮤니티 Markdown·좋아요·저장
+
+익명게시판·종목토론방의 본문과 댓글은 `js/markdown.js`로 Markdown을 표시합니다. HTML은 이스케이프하고 위험한 링크 scheme은 차단합니다. 글 목록·상세의 좋아요와 저장은 로그인 사용자별로 유지되며 각 게시판의 `저장한 글`에서 모아 볼 수 있습니다.
+
+기존 `sql/community.sql` 다음에 `sql/community-reactions.sql`을 한 번 적용합니다. 좋아요 수는 DB trigger로 관리하고, `community_post_actions`는 본인 기록만 읽기·추가·삭제할 수 있습니다. 재시도해도 결과가 뒤집히지 않는 authenticated 전용 RPC를 사용합니다. 목록 20개와 lookahead 1개, bounded batch 조회를 유지하며 exact count와 realtime은 사용하지 않습니다.
+
+추가 검증: `tests/community-reactions-rls.sql`은 실제 DB에서 실행하며 모든 테스트 데이터를 rollback합니다. `tests/community-browser.mjs`는 격리된 API fixture로 데스크톱·모바일 회귀와 Markdown·좋아요·저장 유지 및 해제를 확인합니다.
+
 브라우저에는 `js/supabase.js`의 Publishable Key만 사용합니다. Secret/service_role key를 넣지 않습니다. Supabase Auth의 Site URL과 Redirect URL은 실제 운영 주소 `https://pinfu.naru.pub` 기준으로 유지합니다.
