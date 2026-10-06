@@ -22,9 +22,13 @@ import { bindOrganizationAdmin, confirmLeaveOrganizationEditor, loadOrganization
 import { bindOrganizationTemplateEditor, confirmLeaveOrganizationTemplateEditor, loadOrganizationTemplatesData, renderOrganizationTemplateEditor } from './js/pages/organization-template-editor.js';
 import { bindOrganizationUsersAdmin, loadOrganizationUsers, renderOrganizationUsersAdmin } from './js/pages/organization-users-admin.js';
 import { categoryFor, errorMessage, esc, message } from './js/ui.js';
+import { bindRunner, loginRequired, renderRunner } from './js/pages/runner.js';
+import { bindCommunity, loadCommunity } from './js/pages/community.js';
 
 const OPEN_CHAT_URL = 'https://open.kakao.com/'; // 실제 Q&A 오픈채팅 주소로 교체하세요.
 const app = document.getElementById('app');
+let renderVersion = 0;
+let cleanupCommunity = () => {};
 
 function route() {
   return (location.hash.slice(1) || '/').split('?')[0];
@@ -35,8 +39,13 @@ function navigate(path) {
 }
 
 async function render() {
+  const version = ++renderVersion;
+  cleanupCommunity();
+  cleanupCommunity = () => {};
   const path = route();
   const parts = path.split('/').filter(Boolean);
+  const memberRoute = path === '/runner' || parts[0] === 'community';
+  document.body.classList.toggle('runner-mode', memberRoute);
   let title = '핑후컴퍼니';
   let html;
   let adminPost = null;
@@ -45,7 +54,14 @@ async function render() {
   app.innerHTML = `<div class="shell loading-state">${parts.includes('organization') ? '조직도를 불러오는 중입니다...' : '불러오는 중…'}</div>`;
 
   try {
-    if (parts[0] === 'company' && parts[1] === 'organization' && parts[2]) {
+    if (path === '/runner') {
+      html = getAuthState().loggedIn ? renderRunner() : loginRequired();
+      title = '러너 전용 | 핑후컴퍼니';
+    } else if (parts[0] === 'community') {
+      pageData = await loadCommunity(parts);
+      html = pageData.html;
+      title = '커뮤니티 | 핑후컴퍼니';
+    } else if (parts[0] === 'company' && parts[1] === 'organization' && parts[2]) {
       const profileId = Number(parts[2]);
       if (!Number.isSafeInteger(profileId) || profileId < 1) throw new Error('INVALID_ORG_PROFILE_ID');
       const [profile, detail, innerTemplate] = await Promise.all([getOrgProfile(profileId), getOrgProfileDetail(profileId), getActiveOrgTemplate('INNER')]);
@@ -115,6 +131,7 @@ async function render() {
       const comments = post ? await listComments(id) : [];
       html = renderDetail(parts[1], post, comments);
       title = `${post?.title || '게시글'} | 핑후컴퍼니`;
+      if (version !== renderVersion) return;
       app.innerHTML = html;
       document.title = title;
       if (post) bindDetail({ post, comments, refresh: render, navigate });
@@ -138,9 +155,12 @@ async function render() {
       html = renderHome(notices);
     }
 
+    if (version !== renderVersion) return;
     app.innerHTML = html;
     document.title = title;
     window.scrollTo(0, 0);
+    if (path === '/runner' && getAuthState().loggedIn) bindRunner();
+    if (parts[0] === 'community') cleanupCommunity = bindCommunity(pageData, { navigate, refresh: render, isCurrent: () => version === renderVersion });
     if (parts[0] === 'login' || parts[0] === 'signup') bindAuth(parts[0], navigate);
     if (parts[0] === 'account') bindAccount({ navigate, onProfileChanged: updateAuthUI });
     if (parts[0] === 'company' && parts[1] === 'organization' && !parts[2]) bindOrganizationViewer();
@@ -154,6 +174,7 @@ async function render() {
     else if (parts[0] === 'admin' && parts[1] === 'organization') bindOrganizationAdmin({ data: pageData, params, navigate, refresh: render });
     else if (parts[0] === 'admin') bindAdmin(parts[1] === 'edit' ? 'edit' : 'new', adminPost, navigate);
   } catch (error) {
+    if (version !== renderVersion) return;
     console.error(error);
     const text = error?.message === 'INVALID_POST_ID' ? '잘못된 게시글 주소입니다.' : error?.message === 'INVALID_ORG_PROFILE_ID' ? '잘못된 프로필 주소입니다.' : errorMessage(error, parts.includes('organization') ? '조직도를 불러오지 못했습니다.' : '요청을 처리하지 못했습니다. 네트워크 상태를 확인해주세요.');
     app.innerHTML = `<section class="shell status-page">${message(text, 'error')}<a href="#/">홈으로 돌아가기</a></section>`;
@@ -166,7 +187,7 @@ function updateAuthUI() {
   const utility = document.getElementById('auth-utility');
   const mobileAuth = document.getElementById('mobile-auth-links');
   const links = auth.loggedIn
-    ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>${auth.canManageOrgProfile ? '<a href="#/account/organization">조직도 프로필</a>' : ''}${auth.isAdmin ? '<a href="#/admin/new">게시글 관리</a><a href="#/admin/organization">조직도 관리</a><a href="#/admin/characters">캐릭터 관리</a><a href="#/admin/skills">스킬 관리</a><a href="#/admin/actions">행동 관리</a><a href="#/admin/stats">스탯 정의 관리</a>' : ''}<button type="button" data-global-logout>로그아웃</button>`
+    ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a><a href="#/runner">러너 전용</a>${auth.canManageOrgProfile ? '<a href="#/account/organization">조직도 프로필</a>' : ''}${auth.isAdmin ? '<a href="#/admin/new">게시글 관리</a><a href="#/admin/organization">조직도 관리</a>' : ''}<button type="button" data-global-logout>로그아웃</button>`
     : '<a href="#/login">로그인</a><a href="#/signup">회원가입</a>';
   desktop.innerHTML = links;
   utility.innerHTML = auth.loggedIn ? `<a href="#/account">${esc(auth.profile?.nickname || '내 계정')}</a>` : '<a href="#/login">로그인</a> · <a href="#/signup">회원가입</a>';
@@ -232,6 +253,7 @@ onAuthChange(() => {
   const auth = getAuthState();
   const identity = String(auth.user?.id || '') + ':' + auth.isAdmin;
   if (identity !== characterAuthIdentity && ['/admin/characters','/admin/skills','/admin/actions','/admin/stats'].includes(route())) render();
+  if (identity !== characterAuthIdentity && (route() === '/runner' || route().startsWith('/community/'))) render();
   characterAuthIdentity = identity;
 });
 initDatabase().catch((error) => {

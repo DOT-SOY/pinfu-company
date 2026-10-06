@@ -16,7 +16,7 @@ export function renderStatsAdmin() {
   if(!auth.isAdmin)return '<section class="shell status-page">'+message('관리자 권한이 없습니다.','error')+'</section>';
   return `<section class="character-admin stat-admin" data-stat-admin>
     <header class="character-admin-heading"><div><small>STAT DEFINITIONS</small><h1>스탯 정의 관리</h1><p>캐릭터의 현재 수치가 아닌, 공통 스탯 종류를 관리합니다.</p></div>
-      <div class="admin-page-links"><a href="#/admin/characters">캐릭터 수치 →</a><a href="#/admin/actions">행동 관리 →</a><a href="#/admin/skills">스킬 관리 →</a></div></header>
+      </header>
     <div class="character-workspace"><aside class="character-sidebar"><button type="button" class="submit-button skill-new" id="stat-new">＋ 새 스탯</button>
       <form id="stat-search"><label>표시 이름 / 내부 key<div class="character-search-row"><input name="search" type="search" maxlength="200" placeholder="이름 또는 key"><button type="submit">검색</button></div></label>
       <label>활성 상태<select name="enabled"><option value="">전체</option><option value="true">활성</option><option value="false">비활성</option></select></label></form>

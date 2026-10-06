@@ -23,7 +23,7 @@ export function renderSkillsAdmin() {
   if(!auth.loggedIn) return '<section class="shell status-page">'+message('로그인이 필요합니다.','error')+'<a href="#/login">로그인하기</a></section>';
   if(!auth.isAdmin) return '<section class="shell status-page">'+message('관리자 권한이 없습니다.','error')+'</section>';
   return `<section class="character-admin skill-admin" data-skill-admin>
-    <header class="character-admin-heading"><div><small>SKILL LIBRARY</small><h1>스킬 관리</h1><p>공유 스킬을 만들고 효과·적용 조건을 설정합니다.</p></div><div class="admin-page-links"><a href="#/admin/stats">스탯 정의 관리 →</a><a href="#/admin/actions">행동 관리 →</a><a href="#/admin/characters">캐릭터 관리 →</a></div></header>
+    <header class="character-admin-heading"><div><small>SKILL LIBRARY</small><h1>스킬 관리</h1><p>공유 스킬을 만들고 효과·적용 조건을 설정합니다.</p></div></header>
     <div class="character-workspace"><aside class="character-sidebar">
       <button type="button" class="submit-button skill-new" id="skill-new">＋ 새 스킬</button>
       <form id="skill-search"><label>스킬 이름 / 키 검색<div class="character-search-row"><input type="search" name="search" maxlength="200" placeholder="요령, nunchi"><button type="submit">검색</button></div></label>

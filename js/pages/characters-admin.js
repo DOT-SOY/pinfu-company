@@ -23,7 +23,7 @@ export function renderCharactersAdmin() {
   if (!auth.isAdmin) return '<section class="shell status-page">' + message('관리자 권한이 없습니다.', 'error') + '</section>';
   return `<section class="character-admin" data-character-admin>
     <header class="character-admin-heading"><div><small>CHARACTER ADMIN</small><h1>캐릭터 관리</h1><p>현재 수치와 보유 스킬을 확인하고 관리합니다.</p></div>
-      <div class="admin-page-links"><a href="#/admin/stats">스탯 정의 관리 →</a><a href="#/admin/skills">스킬 관리 →</a></div></header>
+      </header>
     <div class="character-workspace">
       <aside class="character-sidebar"><form id="character-search"><label for="character-search-name">캐릭터 이름 검색</label>
         <div class="character-search-row"><input id="character-search-name" name="search" type="search" maxlength="200" placeholder="이름으로 검색"><button type="submit">검색</button></div>

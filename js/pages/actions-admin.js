@@ -17,7 +17,7 @@ export function renderActionsAdmin() {
   activePage=null;const auth=getAuthState();
   if(!auth.loggedIn)return '<section class="shell status-page">'+message('로그인이 필요합니다.','error')+'<a href="#/login">로그인하기</a></section>';
   if(!auth.isAdmin)return '<section class="shell status-page">'+message('관리자 권한이 없습니다.','error')+'</section>';
-  return `<section class="character-admin action-admin" data-action-admin><header class="character-admin-heading"><div><small>ACTION LIBRARY</small><h1>행동 관리</h1><p>행동과 기본 효과, 적용 조건을 함께 설정합니다.</p></div><div class="admin-page-links"><a href="#/admin/stats">스탯 정의 관리 →</a><a href="#/admin/skills">스킬 관리 →</a></div></header>
+  return `<section class="character-admin action-admin" data-action-admin><header class="character-admin-heading"><div><small>ACTION LIBRARY</small><h1>행동 관리</h1><p>행동과 기본 효과, 적용 조건을 함께 설정합니다.</p></div></header>
     <div class="character-workspace"><aside class="character-sidebar"><button type="button" class="submit-button skill-new" id="action-new">＋ 새 행동</button>
     <form id="action-search"><label>행동 이름 / 명령어 검색<div class="character-search-row"><input name="search" type="search" maxlength="200" placeholder="청소, /정리"><button type="submit">검색</button></div></label>
       <label>활성 상태<select name="enabled"><option value="">전체</option><option value="true">활성</option><option value="false">비활성</option></select></label></form>
